@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/BodyBalance/sw.js', { scope: '/BodyBalance/' })})}

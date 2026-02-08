@@ -4,7 +4,10 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: '/BodyBalance/',
+  base: './',
+  build: {
+    outDir: 'docs',
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -19,8 +22,8 @@ export default defineConfig({
         background_color: '#F2F2F7',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/BodyBalance/',
-        scope: '/BodyBalance/',
+        start_url: './',
+        scope: './',
         icons: [
           {
             src: 'icons/icon-192x192.png',

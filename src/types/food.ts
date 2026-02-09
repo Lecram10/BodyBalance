@@ -19,6 +19,7 @@ export interface FoodItem {
   pointsPer100g: number;
   servingSizeG: number;
   isZeroPoint: boolean;
+  isFavorite?: boolean;
   source: 'openfoodfacts' | 'nevo' | 'user';
   imageUrl?: string;
   createdAt: Date;

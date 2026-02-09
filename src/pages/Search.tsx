@@ -3,47 +3,96 @@ import { useSearchParams } from 'react-router-dom';
 import { PageLayout } from '../components/layout/PageLayout';
 import { FoodSearchResult } from '../components/food/FoodSearchResult';
 import { AddFoodModal } from '../components/food/AddFoodModal';
+import { CreateFoodModal } from '../components/food/CreateFoodModal';
 import { Card } from '../components/ui/Card';
 import { searchFood } from '../lib/food-api';
 import { calculatePointsForQuantity } from '../lib/points-calculator';
+import { getRecentFoods, getFavoriteFoods, toggleFavorite } from '../db/database';
 import { useMealStore } from '../store/meal-store';
 import type { FoodItem, MealType } from '../types/food';
-import { Search as SearchIcon, Loader2 } from 'lucide-react';
+import { Search as SearchIcon, Loader2, Clock, Heart, Plus } from 'lucide-react';
+
+type Tab = 'recent' | 'favorites' | 'search';
 
 export function Search() {
   const [searchParams] = useSearchParams();
   const defaultMealType = (searchParams.get('meal') as MealType) || 'lunch';
 
+  const [activeTab, setActiveTab] = useState<Tab>('recent');
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<FoodItem[]>([]);
+  const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
+  const [recentFoods, setRecentFoods] = useState<FoodItem[]>([]);
+  const [favoriteFoods, setFavoriteFoods] = useState<FoodItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const addEntry = useMealStore((s) => s.addEntry);
 
+  // Laad recent en favorieten bij mount
   useEffect(() => {
-    inputRef.current?.focus();
+    loadRecentAndFavorites();
   }, []);
+
+  const loadRecentAndFavorites = async () => {
+    setIsLoading(true);
+    const [recent, favorites] = await Promise.all([
+      getRecentFoods(),
+      getFavoriteFoods(),
+    ]);
+    setRecentFoods(recent);
+    setFavoriteFoods(favorites);
+    setIsLoading(false);
+  };
 
   const doSearch = useCallback(async (q: string) => {
     if (q.length < 2) {
-      setResults([]);
+      setSearchResults([]);
       setHasSearched(false);
       return;
     }
     setIsSearching(true);
     const items = await searchFood(q);
-    setResults(items);
+    // Markeer favorieten in zoekresultaten
+    const favNames = new Set(favoriteFoods.map((f) => f.name.toLowerCase()));
+    const marked = items.map((item) => ({
+      ...item,
+      isFavorite: favNames.has(item.name.toLowerCase()),
+    }));
+    setSearchResults(marked);
     setIsSearching(false);
     setHasSearched(true);
-  }, []);
+  }, [favoriteFoods]);
 
   const handleQueryChange = (value: string) => {
     setQuery(value);
+    if (value.length >= 2) {
+      setActiveTab('search');
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => doSearch(value), 400);
+  };
+
+  const handleToggleFavorite = async (food: FoodItem) => {
+    const newStatus = await toggleFavorite(food);
+
+    // Update in alle lijsten
+    const updateList = (list: FoodItem[]) =>
+      list.map((f) =>
+        f.name.toLowerCase() === food.name.toLowerCase()
+          ? { ...f, isFavorite: newStatus }
+          : f
+      );
+
+    setRecentFoods(updateList);
+    setSearchResults(updateList);
+
+    // Herlaad favorieten
+    const favorites = await getFavoriteFoods();
+    setFavoriteFoods(favorites);
   };
 
   const handleAddFood = async (quantityG: number, mealType: MealType) => {
@@ -59,9 +108,23 @@ export function Search() {
     });
 
     setSelectedFood(null);
-    setQuery('');
-    setResults([]);
-    setHasSearched(false);
+    // Herlaad recent na toevoegen
+    const recent = await getRecentFoods();
+    setRecentFoods(recent);
+  };
+
+  const handleFoodCreated = (food: FoodItem) => {
+    setShowCreateModal(false);
+    setSelectedFood(food);
+    // Herlaad favorieten (eigen producten worden automatisch favoriet)
+    loadRecentAndFavorites();
+  };
+
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    if (tab === 'search') {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
   };
 
   return (
@@ -79,6 +142,7 @@ export function Search() {
             placeholder="Zoek een product..."
             value={query}
             onChange={(e) => handleQueryChange(e.target.value)}
+            onFocus={() => query.length >= 2 && setActiveTab('search')}
             className="bg-white rounded-xl pl-10 pr-4 py-3 text-[17px] w-full shadow-sm"
           />
           {isSearching && (
@@ -89,42 +153,66 @@ export function Search() {
           )}
         </div>
 
-        {/* Results */}
-        {results.length > 0 && (
-          <Card>
-            {results.map((food, index) => (
-              <div
-                key={`${food.barcode ?? food.name}-${index}`}
-                className={index < results.length - 1 ? 'border-b border-ios-separator' : ''}
-              >
-                <FoodSearchResult food={food} onSelect={setSelectedFood} />
-              </div>
-            ))}
-          </Card>
+        {/* Tab bar */}
+        <div className="flex gap-1 bg-ios-bg rounded-xl p-1">
+          <TabButton
+            active={activeTab === 'recent'}
+            onClick={() => handleTabChange('recent')}
+            icon={<Clock size={14} />}
+            label="Recent"
+          />
+          <TabButton
+            active={activeTab === 'favorites'}
+            onClick={() => handleTabChange('favorites')}
+            icon={<Heart size={14} />}
+            label="Favorieten"
+          />
+          <TabButton
+            active={activeTab === 'search'}
+            onClick={() => handleTabChange('search')}
+            icon={<SearchIcon size={14} />}
+            label="Zoeken"
+          />
+        </div>
+
+        {/* Tab content */}
+        {activeTab === 'recent' && (
+          <RecentTab
+            foods={recentFoods}
+            isLoading={isLoading}
+            onSelect={setSelectedFood}
+            onToggleFavorite={handleToggleFavorite}
+          />
         )}
 
-        {/* Empty state */}
-        {hasSearched && results.length === 0 && !isSearching && (
-          <div className="text-center py-12">
-            <p className="text-[17px] text-ios-secondary">Geen resultaten gevonden</p>
-            <p className="text-[13px] text-ios-secondary mt-1">
-              Probeer een andere zoekterm
-            </p>
-          </div>
+        {activeTab === 'favorites' && (
+          <FavoritesTab
+            foods={favoriteFoods}
+            isLoading={isLoading}
+            onSelect={setSelectedFood}
+            onToggleFavorite={handleToggleFavorite}
+          />
         )}
 
-        {/* Initial state */}
-        {!hasSearched && !isSearching && (
-          <div className="text-center py-12">
-            <SearchIcon size={48} className="text-ios-separator mx-auto mb-3" />
-            <p className="text-[17px] text-ios-secondary">
-              Zoek op productnaam of merk
-            </p>
-            <p className="text-[13px] text-ios-secondary mt-1">
-              Of gebruik de scanner voor barcodes
-            </p>
-          </div>
+        {activeTab === 'search' && (
+          <SearchTab
+            results={searchResults}
+            isSearching={isSearching}
+            hasSearched={hasSearched}
+            query={query}
+            onSelect={setSelectedFood}
+            onToggleFavorite={handleToggleFavorite}
+          />
         )}
+
+        {/* Eigen product knop */}
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center justify-center gap-2 py-3.5 bg-white rounded-xl border border-dashed border-ios-separator text-[15px] font-medium text-primary cursor-pointer active:bg-gray-50 transition-colors"
+        >
+          <Plus size={18} />
+          Eigen product aanmaken
+        </button>
       </div>
 
       {/* Add food modal */}
@@ -136,6 +224,196 @@ export function Search() {
           onClose={() => setSelectedFood(null)}
         />
       )}
+
+      {/* Create food modal */}
+      {showCreateModal && (
+        <CreateFoodModal
+          onCreated={handleFoodCreated}
+          onClose={() => setShowCreateModal(false)}
+        />
+      )}
     </PageLayout>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[13px] font-medium border-none cursor-pointer transition-colors ${
+        active
+          ? 'bg-white text-primary shadow-sm'
+          : 'bg-transparent text-ios-secondary'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function RecentTab({
+  foods,
+  isLoading,
+  onSelect,
+  onToggleFavorite,
+}: {
+  foods: FoodItem[];
+  isLoading: boolean;
+  onSelect: (food: FoodItem) => void;
+  onToggleFavorite: (food: FoodItem) => void;
+}) {
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 size={24} className="text-ios-secondary animate-spin" />
+      </div>
+    );
+  }
+
+  if (foods.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Clock size={48} className="text-ios-separator mx-auto mb-3" />
+        <p className="text-[17px] text-ios-secondary">Nog geen producten gebruikt</p>
+        <p className="text-[13px] text-ios-secondary mt-1">
+          Producten die je logt verschijnen hier automatisch
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      {foods.map((food, index) => (
+        <div
+          key={`recent-${food.name}-${index}`}
+          className={index < foods.length - 1 ? 'border-b border-ios-separator' : ''}
+        >
+          <FoodSearchResult
+            food={food}
+            onSelect={onSelect}
+            onToggleFavorite={onToggleFavorite}
+          />
+        </div>
+      ))}
+    </Card>
+  );
+}
+
+function FavoritesTab({
+  foods,
+  isLoading,
+  onSelect,
+  onToggleFavorite,
+}: {
+  foods: FoodItem[];
+  isLoading: boolean;
+  onSelect: (food: FoodItem) => void;
+  onToggleFavorite: (food: FoodItem) => void;
+}) {
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 size={24} className="text-ios-secondary animate-spin" />
+      </div>
+    );
+  }
+
+  if (foods.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Heart size={48} className="text-ios-separator mx-auto mb-3" />
+        <p className="text-[17px] text-ios-secondary">Geen favorieten</p>
+        <p className="text-[13px] text-ios-secondary mt-1">
+          Tik op het hartje om een product als favoriet op te slaan
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      {foods.map((food, index) => (
+        <div
+          key={`fav-${food.id ?? food.name}-${index}`}
+          className={index < foods.length - 1 ? 'border-b border-ios-separator' : ''}
+        >
+          <FoodSearchResult
+            food={{ ...food, isFavorite: true }}
+            onSelect={onSelect}
+            onToggleFavorite={onToggleFavorite}
+          />
+        </div>
+      ))}
+    </Card>
+  );
+}
+
+function SearchTab({
+  results,
+  isSearching,
+  hasSearched,
+  query,
+  onSelect,
+  onToggleFavorite,
+}: {
+  results: FoodItem[];
+  isSearching: boolean;
+  hasSearched: boolean;
+  query: string;
+  onSelect: (food: FoodItem) => void;
+  onToggleFavorite: (food: FoodItem) => void;
+}) {
+  if (results.length > 0) {
+    return (
+      <Card>
+        {results.map((food, index) => (
+          <div
+            key={`search-${food.barcode ?? food.name}-${index}`}
+            className={index < results.length - 1 ? 'border-b border-ios-separator' : ''}
+          >
+            <FoodSearchResult
+              food={food}
+              onSelect={onSelect}
+              onToggleFavorite={onToggleFavorite}
+            />
+          </div>
+        ))}
+      </Card>
+    );
+  }
+
+  if (hasSearched && results.length === 0 && !isSearching) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-[17px] text-ios-secondary">Geen resultaten voor &quot;{query}&quot;</p>
+        <p className="text-[13px] text-ios-secondary mt-1">
+          Probeer een andere zoekterm of maak een eigen product aan
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="text-center py-12">
+      <SearchIcon size={48} className="text-ios-separator mx-auto mb-3" />
+      <p className="text-[17px] text-ios-secondary">
+        Zoek op productnaam of merk
+      </p>
+      <p className="text-[13px] text-ios-secondary mt-1">
+        Of gebruik de scanner voor barcodes
+      </p>
+    </div>
   );
 }

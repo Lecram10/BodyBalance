@@ -31,23 +31,23 @@
   box-sizing: border-box;
 }
 
-html, body, #root {
+html {
   height: 100%;
-  width: 100%;
-  overflow: hidden;
 }
 
 body {
+  height: 100%;
   background-color: #F2F2F7;
   color: #1C1C1E;
   font-size: 17px;
   line-height: 1.47;
-  overscroll-behavior: none;
+  overscroll-behavior-y: none;
   -webkit-text-size-adjust: 100%;
-  user-select: none;
-  -webkit-user-select: none;
-  position: fixed;
-  width: 100%;
+}
+
+#root {
+  height: 100%;
+  overflow: hidden;
 }
 
 ::-webkit-scrollbar {

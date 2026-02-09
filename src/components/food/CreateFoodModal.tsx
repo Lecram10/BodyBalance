@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, ScanBarcode } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { calculatePointsPer100g } from '../../lib/points-calculator';
 import { saveCustomFood } from '../../db/database';
@@ -13,6 +13,7 @@ interface CreateFoodModalProps {
 export function CreateFoodModal({ onCreated, onClose }: CreateFoodModalProps) {
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
+  const [barcode, setBarcode] = useState('');
   const [servingSize, setServingSize] = useState('100');
   const [nutrition, setNutrition] = useState({
     calories: '',
@@ -45,6 +46,7 @@ export function CreateFoodModal({ onCreated, onClose }: CreateFoodModalProps) {
     const food = await saveCustomFood({
       name: name.trim(),
       brand: brand.trim() || undefined,
+      barcode: barcode.trim() || undefined,
       nutrition: parsedNutrition,
       pointsPer100g: points,
       servingSizeG: Number(servingSize) || 100,
@@ -114,6 +116,25 @@ export function CreateFoodModal({ onCreated, onClose }: CreateFoodModalProps) {
                 onChange={(e) => setBrand(e.target.value)}
                 className="bg-white rounded-xl px-4 py-3 text-[16px] w-full border border-ios-separator"
               />
+            </div>
+            <div>
+              <label className="text-[13px] font-medium text-ios-secondary uppercase tracking-wide block mb-1 px-1">
+                Barcode (optioneel)
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Scan of typ de barcode"
+                  value={barcode}
+                  onChange={(e) => setBarcode(e.target.value.replace(/[^0-9]/g, ''))}
+                  className="bg-white rounded-xl pl-4 pr-10 py-3 text-[16px] w-full border border-ios-separator"
+                />
+                <ScanBarcode size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ios-secondary" />
+              </div>
+              <p className="text-[11px] text-ios-secondary mt-0.5 px-1">
+                Vul de barcode in zodat je dit product later kunt scannen
+              </p>
             </div>
             <div>
               <label className="text-[13px] font-medium text-ios-secondary uppercase tracking-wide block mb-1 px-1">

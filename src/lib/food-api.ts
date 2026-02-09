@@ -1,6 +1,7 @@
 import type { FoodItem, NutritionPer100g } from '../types/food';
 import { calculatePointsPer100g } from './points-calculator';
 import { COMMON_DUTCH_FOODS } from './dutch-foods';
+import { db } from '../db/database';
 
 const OFF_API_BASE = 'https://nl.openfoodfacts.org';
 
@@ -175,22 +176,46 @@ export async function searchFood(query: string): Promise<FoodItem[]> {
   }
 }
 
+const OFF_BARCODE_FIELDS = 'product_name,product_name_nl,brands,code,nutriments,serving_quantity,image_front_small_url';
+
 /**
  * Zoek een product op via barcode.
+ * Volgorde: lokale DB → NL Open Food Facts → World Open Food Facts
  */
 export async function lookupBarcode(barcode: string): Promise<FoodItem | null> {
+  // B: Check eerst lokale database (eigen producten met barcode)
   try {
-    const response = await fetch(
-      `${OFF_API_BASE}/api/v2/product/${barcode}?fields=product_name,product_name_nl,brands,code,nutriments,serving_quantity,image_front_small_url`
-    );
-    if (!response.ok) return null;
+    const localFood = await db.foodItems.where('barcode').equals(barcode).first();
+    if (localFood) return localFood;
+  } catch {
+    // ignore DB errors, doorvallen naar API
+  }
 
-    const data = await response.json();
-    if (data.status !== 1 || !data.product) return null;
+  // A: Probeer NL domein
+  try {
+    const nlResult = await fetchBarcode(`${OFF_API_BASE}/api/v2/product/${barcode}?fields=${OFF_BARCODE_FIELDS}`);
+    if (nlResult) return nlResult;
+  } catch {
+    // ignore, probeer world fallback
+  }
 
-    return mapToFoodItem(data.product);
+  // A: Fallback naar world domein
+  try {
+    const worldResult = await fetchBarcode(`https://world.openfoodfacts.org/api/v2/product/${barcode}?fields=${OFF_BARCODE_FIELDS}`);
+    if (worldResult) return worldResult;
   } catch (error) {
     console.error('Barcode lookup fout:', error);
-    return null;
   }
+
+  return null;
+}
+
+async function fetchBarcode(url: string): Promise<FoodItem | null> {
+  const response = await fetch(url);
+  if (!response.ok) return null;
+
+  const data = await response.json();
+  if (data.status !== 1 || !data.product) return null;
+
+  return mapToFoodItem(data.product);
 }

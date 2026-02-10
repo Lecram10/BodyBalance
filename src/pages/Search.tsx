@@ -5,12 +5,13 @@ import { FoodSearchResult } from '../components/food/FoodSearchResult';
 import { AddFoodModal } from '../components/food/AddFoodModal';
 import { CreateFoodModal } from '../components/food/CreateFoodModal';
 import { Card } from '../components/ui/Card';
+import { RecipeBuilderModal } from '../components/food/RecipeBuilderModal';
 import { searchFood } from '../lib/food-api';
 import { calculatePointsForQuantity } from '../lib/points-calculator';
 import { getRecentFoods, getFavoriteFoods, toggleFavorite } from '../db/database';
 import { useMealStore } from '../store/meal-store';
 import type { FoodItem, MealType } from '../types/food';
-import { Search as SearchIcon, Loader2, Clock, Heart, Plus } from 'lucide-react';
+import { Search as SearchIcon, Loader2, Clock, Heart, Plus, ChefHat } from 'lucide-react';
 
 type Tab = 'recent' | 'favorites' | 'search';
 
@@ -27,6 +28,7 @@ export function Search() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -115,6 +117,7 @@ export function Search() {
 
   const handleFoodCreated = (food: FoodItem) => {
     setShowCreateModal(false);
+    setShowRecipeModal(false);
     setSelectedFood(food);
     // Herlaad favorieten (eigen producten worden automatisch favoriet)
     loadRecentAndFavorites();
@@ -205,14 +208,23 @@ export function Search() {
           />
         )}
 
-        {/* Eigen product knop */}
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center justify-center gap-2 py-3.5 bg-white rounded-xl border border-dashed border-ios-separator text-[15px] font-medium text-primary cursor-pointer active:bg-gray-50 transition-colors"
-        >
-          <Plus size={18} />
-          Eigen product aanmaken
-        </button>
+        {/* Aanmaak knoppen */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-white rounded-xl border border-dashed border-ios-separator text-[15px] font-medium text-primary cursor-pointer active:bg-gray-50 transition-colors"
+          >
+            <Plus size={18} />
+            Eigen product
+          </button>
+          <button
+            onClick={() => setShowRecipeModal(true)}
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-white rounded-xl border border-dashed border-ios-separator text-[15px] font-medium text-ios-blue cursor-pointer active:bg-gray-50 transition-colors"
+          >
+            <ChefHat size={18} />
+            Samengesteld
+          </button>
+        </div>
       </div>
 
       {/* Add food modal */}
@@ -230,6 +242,14 @@ export function Search() {
         <CreateFoodModal
           onCreated={handleFoodCreated}
           onClose={() => setShowCreateModal(false)}
+        />
+      )}
+
+      {/* Recipe builder modal */}
+      {showRecipeModal && (
+        <RecipeBuilderModal
+          onCreated={handleFoodCreated}
+          onClose={() => setShowRecipeModal(false)}
         />
       )}
     </PageLayout>

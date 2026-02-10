@@ -178,3 +178,40 @@ export async function getUserFoods(): Promise<FoodItem[]> {
     .equals('user')
     .toArray();
 }
+
+/**
+ * Bereken hoeveel weekpunten er deze week verbruikt zijn.
+ * Weekpunten = som van alle dagelijkse overschrijdingen (ma-zo).
+ * Als je op een dag 35 eet bij budget 30, kost dat 5 weekpunten.
+ * Onder budget blijven kost geen weekpunten (ongebruikte dagpunten tellen niet op).
+ */
+export async function getWeeklyPointsUsed(
+  currentDate: string,
+  dailyBudget: number
+): Promise<number> {
+  // Bepaal maandag van deze week
+  const date = new Date(currentDate);
+  const dayOfWeek = date.getDay(); // 0=zo, 1=ma, ..., 6=za
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + mondayOffset);
+
+  let totalOverage = 0;
+
+  // Loop door elke dag van ma t/m vandaag
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const dateStr = d.toISOString().split('T')[0];
+
+    // Stop als we voorbij de geselecteerde datum zijn
+    if (dateStr > currentDate) break;
+
+    const log = await db.dailyLogs.where('date').equals(dateStr).first();
+    if (log && log.totalPointsUsed > dailyBudget) {
+      totalOverage += log.totalPointsUsed - dailyBudget;
+    }
+  }
+
+  return totalOverage;
+}

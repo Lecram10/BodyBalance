@@ -135,7 +135,12 @@ export function Profile() {
       const data = {
         version: 2,
         exportDate: new Date().toISOString(),
-        userProfiles: await db.userProfiles.toArray(),
+        userProfiles: (await db.userProfiles.toArray()).map((p) => {
+          const { ...profile } = p as unknown as Record<string, unknown>;
+          delete profile.anthropicApiKey;
+          delete profile.anthropicApiUrl;
+          return profile;
+        }),
         foodItems: await db.foodItems.toArray(),
         mealEntries: await db.mealEntries.toArray(),
         dailyLogs: await db.dailyLogs.toArray(),

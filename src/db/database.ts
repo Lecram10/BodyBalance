@@ -128,18 +128,23 @@ export async function getRecentFoods(limit = 15): Promise<FoodItem[]> {
 
 // Helper: haal alle favoriete producten op
 export async function getFavoriteFoods(): Promise<FoodItem[]> {
+  // Gebruik .filter() i.p.v. indexed query: IndexedDB slaat booleans
+  // inconsistent op (true vs 1), .filter() werkt met beide
   return db.foodItems
-    .where('isFavorite')
-    .equals(1) // Dexie slaat booleans op als 0/1
+    .filter(item => !!item.isFavorite)
     .toArray();
 }
 
 // Helper: toggle favoriet status voor een product
 export async function toggleFavorite(food: FoodItem): Promise<boolean> {
-  // Zoek of het product al in de DB staat
-  let existing = food.id
-    ? await db.foodItems.get(food.id)
-    : await db.foodItems.where('name').equalsIgnoreCase(food.name).first();
+  // Zoek of het product al in de DB staat (altijd op naam zoeken als fallback)
+  let existing: FoodItem | undefined;
+  if (food.id) {
+    existing = await db.foodItems.get(food.id);
+  }
+  if (!existing) {
+    existing = await db.foodItems.where('name').equalsIgnoreCase(food.name).first();
+  }
 
   if (existing?.id) {
     const newStatus = !existing.isFavorite;

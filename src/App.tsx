@@ -6,6 +6,8 @@ import { Onboarding } from './pages/Onboarding';
 import { Dashboard } from './pages/Dashboard';
 import { Search } from './pages/Search';
 import { Scan } from './pages/Scan';
+import { Statistics } from './pages/Statistics';
+import { AIChat } from './pages/AIChat';
 import { Profile } from './pages/Profile';
 
 function AppContent() {
@@ -33,6 +35,8 @@ function AppContent() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/search" element={<Search />} />
         <Route path="/scan" element={<Scan />} />
+        <Route path="/statistics" element={<Statistics />} />
+        <Route path="/ai-chat" element={<AIChat />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

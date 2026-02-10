@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../store/user-store';
 import { PageLayout } from '../components/layout/PageLayout';
 import { Card, CardHeader } from '../components/ui/Card';
@@ -6,15 +7,17 @@ import { Button } from '../components/ui/Button';
 import { InputField, SelectField } from '../components/ui/FormField';
 import { calculateBudget } from '../lib/budget-calculator';
 import { db } from '../db/database';
+import { getAISettings, saveAISettings } from '../lib/ai-service';
 import type { WeightEntry } from '../types/user';
 import { ACTIVITY_LABELS, GOAL_LABELS } from '../types/user';
 import type { Gender, ActivityLevel, Goal } from '../types/user';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Scale, TrendingDown, Target } from 'lucide-react';
+import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Key, Bot, Check, AlertCircle } from 'lucide-react';
 
 export function Profile() {
+  const navigate = useNavigate();
   const { profile, saveProfile, updateWeight } = useUserStore();
   const [weightEntries, setWeightEntries] = useState<WeightEntry[]>([]);
   const [newWeight, setNewWeight] = useState('');
@@ -29,8 +32,23 @@ export function Profile() {
   const [editActivity, setEditActivity] = useState<ActivityLevel>('light');
   const [editGoal, setEditGoal] = useState<Goal>('lose');
 
+  // AI settings
+  const [apiKey, setApiKey] = useState('');
+  const [apiUrl, setApiUrl] = useState('');
+  const [aiSaved, setAiSaved] = useState(false);
+
+  // Notifications
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+
+  // Export/import
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+
   useEffect(() => {
     loadWeightEntries();
+    loadAISettings();
+    checkNotificationPermission();
   }, []);
 
   useEffect(() => {
@@ -67,6 +85,119 @@ export function Profile() {
     await updateWeight(weight);
     setNewWeight('');
     loadWeightEntries();
+  };
+
+  const loadAISettings = async () => {
+    const settings = await getAISettings();
+    if (settings) {
+      setApiKey(settings.apiKey);
+      setApiUrl(settings.apiUrl || '');
+    }
+  };
+
+  const handleSaveAI = async () => {
+    await saveAISettings(apiKey, apiUrl || undefined);
+    setAiSaved(true);
+    setTimeout(() => setAiSaved(false), 2000);
+  };
+
+  const checkNotificationPermission = () => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+      setNotificationsEnabled(Notification.permission === 'granted');
+    }
+  };
+
+  const handleToggleNotifications = async () => {
+    if (!('Notification' in window)) return;
+
+    if (Notification.permission === 'granted') {
+      setNotificationsEnabled(!notificationsEnabled);
+      return;
+    }
+
+    if (Notification.permission === 'default') {
+      const perm = await Notification.requestPermission();
+      setNotificationPermission(perm);
+      setNotificationsEnabled(perm === 'granted');
+      if (perm === 'granted') {
+        new Notification('BodyBalance', {
+          body: 'Notificaties zijn ingeschakeld!',
+          icon: '/icons/icon-192.png',
+        });
+      }
+    }
+  };
+
+  const handleExportData = async () => {
+    try {
+      setExportStatus('Exporteren...');
+      const data = {
+        version: 2,
+        exportDate: new Date().toISOString(),
+        userProfiles: await db.userProfiles.toArray(),
+        foodItems: await db.foodItems.toArray(),
+        mealEntries: await db.mealEntries.toArray(),
+        dailyLogs: await db.dailyLogs.toArray(),
+        weightEntries: await db.weightEntries.toArray(),
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bodybalance-backup-${format(new Date(), 'yyyy-MM-dd')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setExportStatus('Export gelukt!');
+      setTimeout(() => setExportStatus(null), 3000);
+    } catch {
+      setExportStatus('Export mislukt');
+      setTimeout(() => setExportStatus(null), 3000);
+    }
+  };
+
+  const handleImportData = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        setImportStatus('Importeren...');
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        if (!data.version || !data.userProfiles) {
+          setImportStatus('Ongeldig bestand');
+          setTimeout(() => setImportStatus(null), 3000);
+          return;
+        }
+
+        // Wis bestaande data en importeer
+        await db.transaction('rw', [db.userProfiles, db.foodItems, db.mealEntries, db.dailyLogs, db.weightEntries], async () => {
+          await db.foodItems.clear();
+          await db.mealEntries.clear();
+          await db.dailyLogs.clear();
+          await db.weightEntries.clear();
+          await db.userProfiles.clear();
+
+          if (data.userProfiles?.length) await db.userProfiles.bulkAdd(data.userProfiles);
+          if (data.foodItems?.length) await db.foodItems.bulkAdd(data.foodItems);
+          if (data.mealEntries?.length) await db.mealEntries.bulkAdd(data.mealEntries);
+          if (data.dailyLogs?.length) await db.dailyLogs.bulkAdd(data.dailyLogs);
+          if (data.weightEntries?.length) await db.weightEntries.bulkAdd(data.weightEntries);
+        });
+
+        setImportStatus('Import gelukt! Pagina herlaadt...');
+        setTimeout(() => window.location.reload(), 1500);
+      } catch {
+        setImportStatus('Import mislukt - ongeldig bestand');
+        setTimeout(() => setImportStatus(null), 3000);
+      }
+    };
+    input.click();
   };
 
   const handleSaveProfile = async () => {
@@ -276,6 +407,130 @@ export function Profile() {
               </Button>
             </div>
           )}
+        </Card>
+
+        {/* AI Chat link */}
+        <button
+          onClick={() => navigate('/ai-chat')}
+          className="flex items-center gap-3 w-full p-4 bg-white rounded-2xl shadow-sm border-none cursor-pointer active:bg-gray-50 text-left"
+        >
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <Bot size={20} className="text-primary" />
+          </div>
+          <div className="flex-1">
+            <div className="text-[15px] font-semibold">AI Voedingsassistent</div>
+            <div className="text-[13px] text-ios-secondary">Stel vragen over punten en voeding</div>
+          </div>
+        </button>
+
+        {/* AI Instellingen */}
+        <Card>
+          <CardHeader title="AI Instellingen" />
+          <div className="p-4 flex flex-col gap-3">
+            <div>
+              <label className="text-[13px] font-medium text-ios-secondary uppercase tracking-wide block mb-1 px-1">
+                Anthropic API-sleutel
+              </label>
+              <div className="relative">
+                <Key size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ios-secondary" />
+                <input
+                  type="password"
+                  placeholder="sk-ant-..."
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="bg-ios-bg rounded-xl pl-9 pr-4 py-3 text-[15px] w-full"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-[13px] font-medium text-ios-secondary uppercase tracking-wide block mb-1 px-1">
+                API URL (optioneel)
+              </label>
+              <input
+                type="url"
+                placeholder="https://api.anthropic.com/v1/messages"
+                value={apiUrl}
+                onChange={(e) => setApiUrl(e.target.value)}
+                className="bg-ios-bg rounded-xl px-4 py-3 text-[15px] w-full"
+              />
+            </div>
+            <Button fullWidth onClick={handleSaveAI} disabled={!apiKey.trim()}>
+              {aiSaved ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Check size={16} /> Opgeslagen
+                </span>
+              ) : (
+                'Opslaan'
+              )}
+            </Button>
+            <p className="text-[12px] text-ios-secondary text-center">
+              Nodig voor AI foto-herkenning en de voedingsassistent
+            </p>
+          </div>
+        </Card>
+
+        {/* Notificaties */}
+        <Card>
+          <CardHeader title="Notificaties" />
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {notificationsEnabled ? (
+                <Bell size={20} className="text-primary" />
+              ) : (
+                <BellOff size={20} className="text-ios-secondary" />
+              )}
+              <span className="text-[15px]">Dagelijkse herinnering</span>
+            </div>
+            <button
+              onClick={handleToggleNotifications}
+              className={`relative w-[51px] h-[31px] rounded-full border-none cursor-pointer transition-colors ${
+                notificationsEnabled ? 'bg-primary' : 'bg-ios-separator'
+              }`}
+            >
+              <div
+                className={`absolute top-0.5 w-[27px] h-[27px] rounded-full bg-white shadow-sm transition-transform ${
+                  notificationsEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+          {notificationPermission === 'denied' && (
+            <div className="px-4 pb-3 flex items-start gap-2">
+              <AlertCircle size={14} className="text-ios-destructive flex-shrink-0 mt-0.5" />
+              <p className="text-[12px] text-ios-destructive">
+                Notificaties zijn geblokkeerd. Ga naar je browserinstellingen om dit te wijzigen.
+              </p>
+            </div>
+          )}
+        </Card>
+
+        {/* Data beheer */}
+        <Card>
+          <CardHeader title="Data beheer" />
+          <div className="p-4 flex flex-col gap-3">
+            <button
+              onClick={handleExportData}
+              className="flex items-center justify-center gap-2 py-3 bg-ios-bg rounded-xl text-[15px] font-medium text-ios-text border-none cursor-pointer active:bg-gray-200 transition-colors"
+            >
+              <Download size={18} />
+              Data exporteren (JSON)
+            </button>
+            <button
+              onClick={handleImportData}
+              className="flex items-center justify-center gap-2 py-3 bg-ios-bg rounded-xl text-[15px] font-medium text-ios-text border-none cursor-pointer active:bg-gray-200 transition-colors"
+            >
+              <Upload size={18} />
+              Data importeren
+            </button>
+            {(exportStatus || importStatus) && (
+              <p className="text-[13px] text-center text-ios-secondary">
+                {exportStatus || importStatus}
+              </p>
+            )}
+            <p className="text-[12px] text-ios-secondary text-center">
+              Maak een backup van al je data of herstel van een eerdere backup
+            </p>
+          </div>
         </Card>
       </div>
     </PageLayout>

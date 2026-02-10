@@ -1,10 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, Search, ScanBarcode, User } from 'lucide-react';
+import { Home, Search, ScanBarcode, BarChart3, User } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/', icon: Home, label: 'Home' },
   { path: '/search', icon: Search, label: 'Zoeken' },
   { path: '/scan', icon: ScanBarcode, label: 'Scan' },
+  { path: '/statistics', icon: BarChart3, label: 'Stats' },
   { path: '/profile', icon: User, label: 'Profiel' },
 ] as const;
 

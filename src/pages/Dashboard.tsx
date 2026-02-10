@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useUserStore } from '../store/user-store';
 import { useMealStore } from '../store/meal-store';
+import { getWeeklyPointsUsed } from '../db/database';
 import { PageLayout } from '../components/layout/PageLayout';
 import { PointsRing } from '../components/points/PointsRing';
 import { MealSection } from '../components/food/MealSection';
@@ -15,6 +16,7 @@ const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 export function Dashboard() {
   const profile = useUserStore((s) => s.profile);
   const {
+    entries,
     selectedDate,
     setDate,
     loadEntries,
@@ -24,13 +26,23 @@ export function Dashboard() {
     getPointsByMealType,
   } = useMealStore();
 
+  const [weeklyUsed, setWeeklyUsed] = useState(0);
+
   useEffect(() => {
     loadEntries();
   }, [loadEntries]);
 
+  // Herbereken weekpunten als entries of datum wijzigen
+  useEffect(() => {
+    if (profile) {
+      getWeeklyPointsUsed(selectedDate, profile.dailyPointsBudget).then(setWeeklyUsed);
+    }
+  }, [selectedDate, profile, entries]);
+
   if (!profile) return null;
 
   const totalUsed = getTotalPoints();
+  const weeklyRemaining = Math.max(0, profile.weeklyPointsBudget - weeklyUsed);
   const isToday = selectedDate === format(new Date(), 'yyyy-MM-dd');
 
   const navigateDate = (direction: -1 | 1) => {
@@ -74,8 +86,11 @@ export function Dashboard() {
         {/* Weekly points info */}
         <Card className="px-4 py-3 flex items-center justify-between">
           <span className="text-[15px] text-ios-secondary">Weekpunten resterend</span>
-          <span className="text-[17px] font-bold text-ios-blue">
-            {profile.weeklyPointsBudget}
+          <span className={`text-[17px] font-bold ${weeklyRemaining === 0 ? 'text-ios-destructive' : 'text-ios-blue'}`}>
+            {weeklyRemaining}
+            <span className="text-[13px] font-normal text-ios-secondary ml-1">
+              / {profile.weeklyPointsBudget}
+            </span>
           </span>
         </Card>
 

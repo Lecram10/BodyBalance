@@ -5,9 +5,10 @@ interface PointsRingProps {
 }
 
 export function PointsRing({ used, budget, size = 180 }: PointsRingProps) {
-  const remaining = Math.max(0, budget - used);
-  const progress = Math.min(used / budget, 1);
   const isOver = used > budget;
+  const remaining = budget - used; // negatief als over budget
+  const overAmount = isOver ? used - budget : 0;
+  const progress = Math.min(used / budget, 1);
 
   const strokeWidth = 12;
   const radius = (size - strokeWidth) / 2;
@@ -51,7 +52,7 @@ export function PointsRing({ used, budget, size = 180 }: PointsRingProps) {
               isOver ? 'text-ios-destructive' : 'text-ios-text'
             }`}
           >
-            {remaining}
+            {isOver ? overAmount : remaining}
           </span>
           <span className="text-[13px] text-ios-secondary mt-1">
             {isOver ? 'te veel' : 'resterend'}

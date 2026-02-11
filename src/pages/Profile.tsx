@@ -14,7 +14,7 @@ import type { Gender, ActivityLevel, Goal } from '../types/user';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Key, Bot, Check, AlertCircle } from 'lucide-react';
+import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle } from 'lucide-react';
 
 export function Profile() {
   const navigate = useNavigate();
@@ -37,8 +37,9 @@ export function Profile() {
   const [apiUrl, setApiUrl] = useState('');
   const [aiSaved, setAiSaved] = useState(false);
 
-  // Notifications
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  // Notifications (separate toggles)
+  const [mealReminder, setMealReminder] = useState(false);
+  const [waterReminder, setWaterReminder] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 
   // Export/import
@@ -104,29 +105,47 @@ export function Profile() {
   const checkNotificationPermission = () => {
     if ('Notification' in window) {
       setNotificationPermission(Notification.permission);
-      setNotificationsEnabled(Notification.permission === 'granted');
+      const granted = Notification.permission === 'granted';
+      setMealReminder(granted);
+      setWaterReminder(granted);
     }
   };
 
-  const handleToggleNotifications = async () => {
-    if (!('Notification' in window)) return;
+  const requestNotificationPermission = async (): Promise<boolean> => {
+    if (!('Notification' in window)) return false;
 
-    if (Notification.permission === 'granted') {
-      setNotificationsEnabled(!notificationsEnabled);
-      return;
-    }
+    if (Notification.permission === 'granted') return true;
 
     if (Notification.permission === 'default') {
       const perm = await Notification.requestPermission();
       setNotificationPermission(perm);
-      setNotificationsEnabled(perm === 'granted');
       if (perm === 'granted') {
         new Notification('BodyBalance', {
           body: 'Notificaties zijn ingeschakeld!',
           icon: '/icons/icon-192.png',
         });
+        return true;
       }
     }
+    return false;
+  };
+
+  const handleToggleMealReminder = async () => {
+    if (mealReminder) {
+      setMealReminder(false);
+      return;
+    }
+    const granted = await requestNotificationPermission();
+    if (granted) setMealReminder(true);
+  };
+
+  const handleToggleWaterReminder = async () => {
+    if (waterReminder) {
+      setWaterReminder(false);
+      return;
+    }
+    const granted = await requestNotificationPermission();
+    if (granted) setWaterReminder(true);
   };
 
   const handleExportData = async () => {
@@ -477,24 +496,48 @@ export function Profile() {
         {/* Notificaties */}
         <Card>
           <CardHeader title="Notificaties" />
-          <div className="px-4 py-3 flex items-center justify-between">
+          {/* Maaltijd herinnering */}
+          <div className="px-4 py-3 flex items-center justify-between border-b border-ios-separator">
             <div className="flex items-center gap-3">
-              {notificationsEnabled ? (
+              {mealReminder ? (
                 <Bell size={20} className="text-primary" />
               ) : (
                 <BellOff size={20} className="text-ios-secondary" />
               )}
-              <span className="text-[15px]">Dagelijkse herinnering</span>
+              <span className="text-[15px]">Maaltijd herinnering</span>
             </div>
             <button
-              onClick={handleToggleNotifications}
+              onClick={handleToggleMealReminder}
               className={`relative w-[51px] h-[31px] rounded-full border-none cursor-pointer transition-colors ${
-                notificationsEnabled ? 'bg-primary' : 'bg-ios-separator'
+                mealReminder ? 'bg-primary' : 'bg-ios-separator'
               }`}
             >
               <div
                 className={`absolute top-0.5 w-[27px] h-[27px] rounded-full bg-white shadow-sm transition-transform ${
-                  notificationsEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
+                  mealReminder ? 'translate-x-[22px]' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+          {/* Water herinnering */}
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {waterReminder ? (
+                <Droplets size={20} className="text-blue-500" />
+              ) : (
+                <Droplets size={20} className="text-ios-secondary" />
+              )}
+              <span className="text-[15px]">Water herinnering</span>
+            </div>
+            <button
+              onClick={handleToggleWaterReminder}
+              className={`relative w-[51px] h-[31px] rounded-full border-none cursor-pointer transition-colors ${
+                waterReminder ? 'bg-blue-500' : 'bg-ios-separator'
+              }`}
+            >
+              <div
+                className={`absolute top-0.5 w-[27px] h-[27px] rounded-full bg-white shadow-sm transition-transform ${
+                  waterReminder ? 'translate-x-[22px]' : 'translate-x-0.5'
                 }`}
               />
             </button>

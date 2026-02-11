@@ -10,6 +10,8 @@ export interface NutritionPer100g {
   fiber: number;
 }
 
+export type FoodUnit = 'g' | 'ml';
+
 export interface FoodItem {
   id?: number;
   name: string;
@@ -18,6 +20,7 @@ export interface FoodItem {
   nutrition: NutritionPer100g;
   pointsPer100g: number;
   servingSizeG: number;
+  unit?: FoodUnit;
   isZeroPoint: boolean;
   isFavorite?: boolean;
   source: 'openfoodfacts' | 'nevo' | 'user';
@@ -32,6 +35,7 @@ export interface MealEntry {
   foodItem: FoodItem;
   mealType: MealType;
   quantityG: number;
+  quantity?: number;
   points: number;
   loggedAt: Date;
 }

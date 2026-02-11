@@ -1,4 +1,4 @@
-import type { FoodItem, NutritionPer100g } from '../types/food';
+import type { FoodItem, FoodUnit, NutritionPer100g } from '../types/food';
 import { calculatePointsPer100g } from './points-calculator';
 import { COMMON_DUTCH_FOODS } from './dutch-foods';
 import { db } from '../db/database';
@@ -12,6 +12,8 @@ interface OpenFoodFactsProduct {
   code?: string;
   image_front_small_url?: string;
   serving_quantity?: number;
+  serving_size?: string;
+  quantity?: string;
   nutriments?: {
     'energy-kcal_100g'?: number;
     proteins_100g?: number;
@@ -47,6 +49,12 @@ function parseNutrition(nutriments: OpenFoodFactsProduct['nutriments']): Nutriti
   };
 }
 
+function detectUnit(product: OpenFoodFactsProduct): FoodUnit {
+  const fields = [product.serving_size, product.quantity].filter(Boolean).join(' ').toLowerCase();
+  if (/\bml\b|\bliter\b|\bcl\b|\bdl\b/.test(fields)) return 'ml';
+  return 'g';
+}
+
 function mapToFoodItem(product: OpenFoodFactsProduct): FoodItem | null {
   const name = product.product_name_nl || product.product_name;
   if (!name) return null;
@@ -55,6 +63,7 @@ function mapToFoodItem(product: OpenFoodFactsProduct): FoodItem | null {
   if (nutrition.calories === 0 && nutrition.protein === 0 && nutrition.fat === 0) return null;
 
   const pointsPer100g = calculatePointsPer100g(nutrition);
+  const unit = detectUnit(product);
 
   return {
     name,
@@ -63,6 +72,7 @@ function mapToFoodItem(product: OpenFoodFactsProduct): FoodItem | null {
     nutrition,
     pointsPer100g,
     servingSizeG: product.serving_quantity || 100,
+    unit,
     isZeroPoint: pointsPer100g === 0,
     source: 'openfoodfacts',
     imageUrl: product.image_front_small_url || undefined,
@@ -107,7 +117,7 @@ export async function searchFood(query: string): Promise<FoodItem[]> {
       action: 'process',
       json: '1',
       page_size: '20',
-      fields: 'product_name,product_name_nl,brands,code,nutriments,serving_quantity,image_front_small_url',
+      fields: 'product_name,product_name_nl,brands,code,nutriments,serving_quantity,serving_size,quantity,image_front_small_url',
       lc: 'nl',
       tagtype_0: 'countries',
       tag_contains_0: 'contains',
@@ -133,7 +143,7 @@ export async function searchFood(query: string): Promise<FoodItem[]> {
         action: 'process',
         json: '1',
         page_size: '10',
-        fields: 'product_name,product_name_nl,brands,code,nutriments,serving_quantity,image_front_small_url',
+        fields: 'product_name,product_name_nl,brands,code,nutriments,serving_quantity,serving_size,quantity,image_front_small_url',
         lc: 'nl',
       });
 
@@ -176,7 +186,7 @@ export async function searchFood(query: string): Promise<FoodItem[]> {
   }
 }
 
-const OFF_BARCODE_FIELDS = 'product_name,product_name_nl,brands,code,nutriments,serving_quantity,image_front_small_url';
+const OFF_BARCODE_FIELDS = 'product_name,product_name_nl,brands,code,nutriments,serving_quantity,serving_size,quantity,image_front_small_url';
 
 /**
  * Zoek een product op via barcode.

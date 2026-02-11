@@ -11,9 +11,10 @@ import { calculatePointsForQuantity } from '../lib/points-calculator';
 import { getRecentFoods, getFavoriteFoods, toggleFavorite } from '../db/database';
 import { useMealStore } from '../store/meal-store';
 import type { FoodItem, MealType } from '../types/food';
-import { Search as SearchIcon, Loader2, Clock, Heart, Plus, ChefHat } from 'lucide-react';
+import { ZERO_POINT_CATEGORIES } from '../lib/zero-point-foods';
+import { Search as SearchIcon, Loader2, Clock, Heart, Plus, ChefHat, Leaf, ChevronDown, ChevronRight } from 'lucide-react';
 
-type Tab = 'recent' | 'favorites' | 'search';
+type Tab = 'recent' | 'favorites' | 'zeropoint' | 'search';
 
 export function Search() {
   const [searchParams] = useSearchParams();
@@ -97,15 +98,17 @@ export function Search() {
     setFavoriteFoods(favorites);
   };
 
-  const handleAddFood = async (quantityG: number, mealType: MealType) => {
+  const handleAddFood = async (quantityG: number, mealType: MealType, quantity?: number) => {
     if (!selectedFood) return;
 
-    const points = calculatePointsForQuantity(selectedFood.pointsPer100g, quantityG);
+    const pointsPerItem = calculatePointsForQuantity(selectedFood.pointsPer100g, quantityG);
+    const points = pointsPerItem * (quantity || 1);
 
     await addEntry({
       foodItem: selectedFood,
       mealType,
       quantityG,
+      quantity,
       points,
     });
 
@@ -171,6 +174,12 @@ export function Search() {
             label="Favorieten"
           />
           <TabButton
+            active={activeTab === 'zeropoint'}
+            onClick={() => handleTabChange('zeropoint')}
+            icon={<Leaf size={14} />}
+            label="0 Punten"
+          />
+          <TabButton
             active={activeTab === 'search'}
             onClick={() => handleTabChange('search')}
             icon={<SearchIcon size={14} />}
@@ -195,6 +204,10 @@ export function Search() {
             onSelect={setSelectedFood}
             onToggleFavorite={handleToggleFavorite}
           />
+        )}
+
+        {activeTab === 'zeropoint' && (
+          <ZeroPointTab onSelect={setSelectedFood} />
         )}
 
         {activeTab === 'search' && (
@@ -377,6 +390,65 @@ function FavoritesTab({
         </div>
       ))}
     </Card>
+  );
+}
+
+function ZeroPointTab({ onSelect }: { onSelect: (food: FoodItem) => void }) {
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(ZERO_POINT_CATEGORIES[0]?.name ?? null);
+
+  const createZeroPointFood = (name: string): FoodItem => ({
+    name,
+    nutrition: {
+      calories: 0, protein: 0, fat: 0, saturatedFat: 0,
+      unsaturatedFat: 0, carbs: 0, sugar: 0, addedSugar: 0, fiber: 0,
+    },
+    pointsPer100g: 0,
+    servingSizeG: 100,
+    isZeroPoint: true,
+    source: 'nevo',
+    createdAt: new Date(),
+  });
+
+  return (
+    <div className="flex flex-col gap-2">
+      {ZERO_POINT_CATEGORIES.map((category) => {
+        const isExpanded = expandedCategory === category.name;
+        return (
+          <Card key={category.name}>
+            <button
+              onClick={() => setExpandedCategory(isExpanded ? null : category.name)}
+              className="w-full flex items-center justify-between px-4 py-3 border-none bg-transparent cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="text-lg">{category.icon}</span>
+                <span className="text-[15px] font-semibold">{category.name}</span>
+                <span className="text-[13px] text-ios-secondary">({category.items.length})</span>
+              </div>
+              {isExpanded
+                ? <ChevronDown size={18} className="text-ios-secondary" />
+                : <ChevronRight size={18} className="text-ios-secondary" />
+              }
+            </button>
+            {isExpanded && (
+              <div className="border-t border-ios-separator">
+                {category.items.map((item, i) => (
+                  <button
+                    key={item}
+                    onClick={() => onSelect(createZeroPointFood(item))}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 border-none bg-transparent cursor-pointer active:bg-gray-50 text-left ${
+                      i < category.items.length - 1 ? 'border-b border-ios-separator' : ''
+                    }`}
+                  >
+                    <span className="text-[15px]">{item}</span>
+                    <span className="text-[13px] font-medium text-primary">0 pt</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </div>
   );
 }
 

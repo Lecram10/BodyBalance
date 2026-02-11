@@ -3,7 +3,7 @@ import { X, ScanBarcode } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { calculatePointsPer100g } from '../../lib/points-calculator';
 import { saveCustomFood } from '../../db/database';
-import type { FoodItem, NutritionPer100g } from '../../types/food';
+import type { FoodItem, FoodUnit, NutritionPer100g } from '../../types/food';
 
 interface CreateFoodModalProps {
   onCreated: (food: FoodItem) => void;
@@ -15,6 +15,7 @@ export function CreateFoodModal({ onCreated, onClose }: CreateFoodModalProps) {
   const [brand, setBrand] = useState('');
   const [barcode, setBarcode] = useState('');
   const [servingSize, setServingSize] = useState('100');
+  const [unit, setUnit] = useState<FoodUnit>('g');
   const [nutrition, setNutrition] = useState({
     calories: '',
     protein: '',
@@ -50,6 +51,7 @@ export function CreateFoodModal({ onCreated, onClose }: CreateFoodModalProps) {
       nutrition: parsedNutrition,
       pointsPer100g: points,
       servingSizeG: Number(servingSize) || 100,
+      unit,
       isZeroPoint: points === 0,
       isFavorite: true,
       source: 'user',
@@ -138,7 +140,27 @@ export function CreateFoodModal({ onCreated, onClose }: CreateFoodModalProps) {
             </div>
             <div>
               <label className="text-[13px] font-medium text-ios-secondary uppercase tracking-wide block mb-1 px-1">
-                Standaard portie (gram)
+                Eenheid
+              </label>
+              <div className="flex gap-2">
+                {(['g', 'ml'] as FoodUnit[]).map((u) => (
+                  <button
+                    key={u}
+                    onClick={() => setUnit(u)}
+                    className={`flex-1 py-2.5 rounded-xl text-[14px] font-medium border-none cursor-pointer transition-colors ${
+                      unit === u
+                        ? 'bg-primary text-white'
+                        : 'bg-ios-bg text-ios-text active:bg-gray-200'
+                    }`}
+                  >
+                    {u === 'g' ? 'Gram (g)' : 'Milliliter (ml)'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-[13px] font-medium text-ios-secondary uppercase tracking-wide block mb-1 px-1">
+                Standaard portie ({unit})
               </label>
               <input
                 type="number"
@@ -152,7 +174,7 @@ export function CreateFoodModal({ onCreated, onClose }: CreateFoodModalProps) {
 
           {/* Voedingswaarden header */}
           <label className="text-[13px] font-medium text-ios-secondary uppercase tracking-wide block mb-2 px-1">
-            Voedingswaarden per 100g *
+            Voedingswaarden per 100{unit} *
           </label>
 
           {/* Voedingswaarden grid */}
@@ -197,7 +219,7 @@ export function CreateFoodModal({ onCreated, onClose }: CreateFoodModalProps) {
           {/* Punten preview */}
           <div className="bg-ios-bg rounded-2xl p-4 mb-5 text-center">
             <div className="text-[36px] font-bold text-primary leading-none">{points}</div>
-            <div className="text-[13px] text-ios-secondary mt-1">punten per 100g</div>
+            <div className="text-[13px] text-ios-secondary mt-1">punten per 100{unit}</div>
           </div>
 
           {/* Tip */}
@@ -208,7 +230,7 @@ export function CreateFoodModal({ onCreated, onClose }: CreateFoodModalProps) {
 
           {/* Save button */}
           <Button fullWidth size="lg" onClick={handleSave} disabled={!isValid}>
-            Opslaan — {points} pt/100g
+            Opslaan — {points} pt/100{unit}
           </Button>
         </div>
       </div>

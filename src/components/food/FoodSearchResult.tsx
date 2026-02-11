@@ -1,5 +1,6 @@
 import { Heart } from 'lucide-react';
 import type { FoodItem } from '../../types/food';
+import { calculatePointsForQuantity } from '../../lib/points-calculator';
 
 interface FoodSearchResultProps {
   food: FoodItem;
@@ -9,6 +10,9 @@ interface FoodSearchResultProps {
 }
 
 export function FoodSearchResult({ food, onSelect, onToggleFavorite, showFavorite = true }: FoodSearchResultProps) {
+  const servingPoints = calculatePointsForQuantity(food.pointsPer100g, food.servingSizeG || 100);
+  const unitShort = food.unit === 'ml' ? 'ml' : 'g';
+
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <button
@@ -36,9 +40,9 @@ export function FoodSearchResult({ food, onSelect, onToggleFavorite, showFavorit
         </div>
         <div className="flex-shrink-0 text-right">
           <div className={`text-[17px] font-bold ${food.isZeroPoint ? 'text-primary' : 'text-ios-text'}`}>
-            {food.pointsPer100g}
+            {servingPoints}
           </div>
-          <div className="text-[11px] text-ios-secondary">pt/100g</div>
+          <div className="text-[11px] text-ios-secondary">pt/{food.servingSizeG}{unitShort}</div>
         </div>
       </button>
 

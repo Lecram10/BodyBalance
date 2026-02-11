@@ -44,4 +44,5 @@ export interface DailyLog {
   date: string;
   totalPointsUsed: number;
   weeklyPointsUsed: number;
+  waterMl?: number;
 }

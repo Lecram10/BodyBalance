@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useUserStore } from '../store/user-store';
 import { useMealStore } from '../store/meal-store';
-import { getWeeklyPointsUsed } from '../db/database';
+import { getWeeklyPointsUsed, getWaterIntake, addWaterIntake, resetWaterIntake } from '../db/database';
 import { PageLayout } from '../components/layout/PageLayout';
 import { PointsRing } from '../components/points/PointsRing';
 import { MealSection } from '../components/food/MealSection';
 import { Card } from '../components/ui/Card';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Droplets, GlassWater, Coffee, RotateCcw } from 'lucide-react';
 import type { MealType } from '../types/food';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -27,6 +27,13 @@ export function Dashboard() {
   } = useMealStore();
 
   const [weeklyUsed, setWeeklyUsed] = useState(0);
+  const [waterMl, setWaterMl] = useState(0);
+  const waterGoal = 2000; // 2 liter
+
+  const loadWater = useCallback(async () => {
+    const ml = await getWaterIntake(selectedDate);
+    setWaterMl(ml);
+  }, [selectedDate]);
 
   useEffect(() => {
     loadEntries();
@@ -38,6 +45,21 @@ export function Dashboard() {
       getWeeklyPointsUsed(selectedDate, profile.dailyPointsBudget).then(setWeeklyUsed);
     }
   }, [selectedDate, profile, entries]);
+
+  // Laad waterinname bij datumwijziging
+  useEffect(() => {
+    loadWater();
+  }, [loadWater]);
+
+  const handleAddWater = async (ml: number) => {
+    const newTotal = await addWaterIntake(selectedDate, ml);
+    setWaterMl(newTotal);
+  };
+
+  const handleResetWater = async () => {
+    await resetWaterIntake(selectedDate);
+    setWaterMl(0);
+  };
 
   if (!profile) return null;
 
@@ -104,6 +126,73 @@ export function Dashboard() {
             onRemoveEntry={removeEntry}
           />
         ))}
+
+        {/* Water tracker */}
+        <Card>
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Droplets size={20} className="text-blue-500" />
+                <span className="text-[17px] font-semibold">Water</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[15px] font-bold text-blue-500">
+                  {(waterMl / 1000).toFixed(1)} / {(waterGoal / 1000).toFixed(1)} L
+                </span>
+                {waterMl > 0 && (
+                  <button
+                    onClick={handleResetWater}
+                    className="w-7 h-7 rounded-full bg-transparent border-none cursor-pointer flex items-center justify-center active:bg-gray-100"
+                  >
+                    <RotateCcw size={14} className="text-ios-secondary" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full h-3 bg-blue-100 rounded-full overflow-hidden mb-3">
+              <div
+                className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                style={{ width: `${Math.min(100, (waterMl / waterGoal) * 100)}%` }}
+              />
+            </div>
+
+            {/* Quick add buttons */}
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => handleAddWater(150)}
+                className="flex flex-col items-center gap-1 py-2.5 bg-blue-50 rounded-xl border-none cursor-pointer active:bg-blue-100 transition-colors"
+              >
+                <GlassWater size={18} className="text-blue-500" />
+                <span className="text-[13px] font-medium text-blue-700">+150ml</span>
+                <span className="text-[11px] text-blue-400">glas</span>
+              </button>
+              <button
+                onClick={() => handleAddWater(250)}
+                className="flex flex-col items-center gap-1 py-2.5 bg-blue-50 rounded-xl border-none cursor-pointer active:bg-blue-100 transition-colors"
+              >
+                <Coffee size={18} className="text-blue-500" />
+                <span className="text-[13px] font-medium text-blue-700">+250ml</span>
+                <span className="text-[11px] text-blue-400">beker</span>
+              </button>
+              <button
+                onClick={() => handleAddWater(500)}
+                className="flex flex-col items-center gap-1 py-2.5 bg-blue-50 rounded-xl border-none cursor-pointer active:bg-blue-100 transition-colors"
+              >
+                <Droplets size={18} className="text-blue-500" />
+                <span className="text-[13px] font-medium text-blue-700">+500ml</span>
+                <span className="text-[11px] text-blue-400">fles</span>
+              </button>
+            </div>
+
+            {waterMl >= waterGoal && (
+              <p className="text-[13px] text-center text-green-600 font-medium mt-2">
+                Waterdoel bereikt!
+              </p>
+            )}
+          </div>
+        </Card>
       </div>
     </PageLayout>
   );

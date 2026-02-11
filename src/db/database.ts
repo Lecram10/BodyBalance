@@ -215,3 +215,31 @@ export async function getWeeklyPointsUsed(
 
   return totalOverage;
 }
+
+/**
+ * Haal de waterinname op voor een datum (in ml).
+ */
+export async function getWaterIntake(date: string): Promise<number> {
+  const log = await db.dailyLogs.where('date').equals(date).first();
+  return log?.waterMl ?? 0;
+}
+
+/**
+ * Voeg water toe aan de daglog (in ml). Geeft het nieuwe totaal terug.
+ */
+export async function addWaterIntake(date: string, ml: number): Promise<number> {
+  const log = await getOrCreateDailyLog(date);
+  const newTotal = (log.waterMl ?? 0) + ml;
+  await db.dailyLogs.update(log.id!, { waterMl: newTotal });
+  return newTotal;
+}
+
+/**
+ * Reset waterinname voor een datum.
+ */
+export async function resetWaterIntake(date: string): Promise<void> {
+  const log = await db.dailyLogs.where('date').equals(date).first();
+  if (log?.id) {
+    await db.dailyLogs.update(log.id, { waterMl: 0 });
+  }
+}

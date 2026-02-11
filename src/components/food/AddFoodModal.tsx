@@ -8,15 +8,19 @@ import { X } from 'lucide-react';
 interface AddFoodModalProps {
   food: FoodItem;
   defaultMealType: MealType;
-  onAdd: (quantityG: number, mealType: MealType) => void;
+  onAdd: (quantityG: number, mealType: MealType, quantity?: number) => void;
   onClose: () => void;
 }
 
 export function AddFoodModal({ food, defaultMealType, onAdd, onClose }: AddFoodModalProps) {
   const [quantityG, setQuantityG] = useState(food.servingSizeG || 100);
+  const [quantity, setQuantity] = useState(1);
   const [mealType, setMealType] = useState<MealType>(defaultMealType);
 
-  const points = calculatePointsForQuantity(food.pointsPer100g, quantityG);
+  const unitLabel = food.unit === 'ml' ? 'ml' : 'gram';
+  const unitShort = food.unit === 'ml' ? 'ml' : 'g';
+  const pointsPerItem = calculatePointsForQuantity(food.pointsPer100g, quantityG);
+  const points = pointsPerItem * quantity;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center animate-fade-in">
@@ -86,12 +90,45 @@ export function AddFoodModal({ food, defaultMealType, onAdd, onClose }: AddFoodM
                   min={1}
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ios-secondary text-[15px]">
-                  gram
+                  {unitLabel}
                 </span>
               </div>
               <button
                 className="w-10 h-10 rounded-full bg-ios-bg text-ios-text border-none cursor-pointer text-xl font-medium active:bg-gray-200"
                 onClick={() => setQuantityG(quantityG + 10)}
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          {/* Aantal */}
+          <div className="mb-4">
+            <label className="text-[13px] font-medium text-ios-secondary uppercase tracking-wide block mb-1.5 px-1">
+              Aantal
+            </label>
+            <div className="flex items-center gap-3">
+              <button
+                className="w-10 h-10 rounded-full bg-ios-bg text-ios-text border-none cursor-pointer text-xl font-medium active:bg-gray-200"
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              >
+                -
+              </button>
+              <div className="relative flex-1">
+                <input
+                  type="number"
+                  value={quantity}
+                  onChange={(e) => setQuantity(Math.max(1, Math.round(Number(e.target.value))))}
+                  className="text-center bg-white rounded-xl text-[20px] font-medium"
+                  min={1}
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ios-secondary text-[15px]">
+                  stuks
+                </span>
+              </div>
+              <button
+                className="w-10 h-10 rounded-full bg-ios-bg text-ios-text border-none cursor-pointer text-xl font-medium active:bg-gray-200"
+                onClick={() => setQuantity(quantity + 1)}
               >
                 +
               </button>
@@ -110,7 +147,7 @@ export function AddFoodModal({ food, defaultMealType, onAdd, onClose }: AddFoodM
                     : 'bg-ios-bg text-ios-text active:bg-gray-200'
                 }`}
               >
-                {g}g
+                {g}{unitShort}
               </button>
             ))}
           </div>
@@ -141,33 +178,33 @@ export function AddFoodModal({ food, defaultMealType, onAdd, onClose }: AddFoodM
           <div className="flex justify-around mb-5 py-3 bg-ios-bg rounded-xl">
             <div className="text-center">
               <div className="text-[15px] font-semibold">
-                {Math.round((food.nutrition.calories * quantityG) / 100)}
+                {Math.round((food.nutrition.calories * quantityG * quantity) / 100)}
               </div>
               <div className="text-[11px] text-ios-secondary">kcal</div>
             </div>
             <div className="text-center">
               <div className="text-[15px] font-semibold">
-                {((food.nutrition.protein * quantityG) / 100).toFixed(1)}g
+                {((food.nutrition.protein * quantityG * quantity) / 100).toFixed(1)}g
               </div>
               <div className="text-[11px] text-ios-secondary">eiwit</div>
             </div>
             <div className="text-center">
               <div className="text-[15px] font-semibold">
-                {((food.nutrition.carbs * quantityG) / 100).toFixed(1)}g
+                {((food.nutrition.carbs * quantityG * quantity) / 100).toFixed(1)}g
               </div>
               <div className="text-[11px] text-ios-secondary">koolh.</div>
             </div>
             <div className="text-center">
               <div className="text-[15px] font-semibold">
-                {((food.nutrition.fat * quantityG) / 100).toFixed(1)}g
+                {((food.nutrition.fat * quantityG * quantity) / 100).toFixed(1)}g
               </div>
               <div className="text-[11px] text-ios-secondary">vet</div>
             </div>
           </div>
 
           {/* Add button */}
-          <Button fullWidth size="lg" onClick={() => onAdd(quantityG, mealType)}>
-            Toevoegen — {points} pt
+          <Button fullWidth size="lg" onClick={() => onAdd(quantityG, mealType, quantity > 1 ? quantity : undefined)}>
+            Toevoegen — {points} pt{quantity > 1 ? ` (${quantity}×)` : ''}
           </Button>
         </div>
       </div>

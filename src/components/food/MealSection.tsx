@@ -46,7 +46,12 @@ export function MealSection({ mealType, entries, totalPoints, onRemoveEntry }: M
               <div className="flex-1 min-w-0">
                 <div className="text-[15px] truncate">{entry.foodItem.name}</div>
                 <div className="text-[13px] text-ios-secondary">
-                  {entry.quantityG}g
+                  {(() => {
+                    const u = entry.foodItem.unit === 'ml' ? 'ml' : 'g';
+                    return entry.quantity && entry.quantity > 1
+                      ? `${entry.quantity}× ${entry.quantityG}${u}`
+                      : `${entry.quantityG}${u}`;
+                  })()}
                 </div>
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">

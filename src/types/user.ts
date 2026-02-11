@@ -27,6 +27,7 @@ export interface UserProfile {
   goal: Goal;
   dailyPointsBudget: number;
   weeklyPointsBudget: number;
+  waterGoalMl?: number;
   onboardingComplete: boolean;
   createdAt: Date;
   updatedAt: Date;

@@ -28,7 +28,7 @@ export function Dashboard() {
 
   const [weeklyUsed, setWeeklyUsed] = useState(0);
   const [waterMl, setWaterMl] = useState(0);
-  const waterGoal = 2000; // 2 liter
+  const waterGoal = profile?.waterGoalMl || 2000;
 
   const loadWater = useCallback(async () => {
     const ml = await getWaterIntake(selectedDate);

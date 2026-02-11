@@ -493,6 +493,36 @@ export function Profile() {
           </div>
         </Card>
 
+        {/* Waterdoel */}
+        <Card>
+          <CardHeader title="Waterdoel" />
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Droplets size={20} className="text-blue-500" />
+              <span className="text-[15px]">Dagelijks doel</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {[1500, 2000, 2500, 3000].map((ml) => (
+                <button
+                  key={ml}
+                  onClick={async () => {
+                    if (!profile?.id) return;
+                    await db.userProfiles.update(profile.id, { waterGoalMl: ml, updatedAt: new Date() });
+                    useUserStore.setState({ profile: { ...profile, waterGoalMl: ml } });
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[13px] font-medium border-none cursor-pointer transition-colors ${
+                    (profile?.waterGoalMl || 2000) === ml
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-ios-bg text-ios-text active:bg-gray-200'
+                  }`}
+                >
+                  {ml / 1000}L
+                </button>
+              ))}
+            </div>
+          </div>
+        </Card>
+
         {/* Notificaties */}
         <Card>
           <CardHeader title="Notificaties" />

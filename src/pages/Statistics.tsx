@@ -12,6 +12,7 @@ import type { WeightEntry } from '../types/user';
 export function Statistics() {
   const profile = useUserStore((s) => s.profile);
   const [weekData, setWeekData] = useState<{ dag: string; punten: number; budget: number }[]>([]);
+  const [waterWeekData, setWaterWeekData] = useState<{ dag: string; water: number; doel: number }[]>([]);
   const [mealDistribution, setMealDistribution] = useState<{ name: string; value: number }[]>([]);
   const [weightData, setWeightData] = useState<{ date: string; gewicht: number }[]>([]);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -28,6 +29,8 @@ export function Statistics() {
     const targetWeek = subWeeks(now, weekOffset);
     const monday = startOfWeek(targetWeek, { weekStartsOn: 1 });
     const days: { dag: string; punten: number; budget: number }[] = [];
+    const waterDays: { dag: string; water: number; doel: number }[] = [];
+    const waterGoal = profile.waterGoalMl || 2000;
 
     for (let i = 0; i < 7; i++) {
       const d = addDays(monday, i);
@@ -38,8 +41,14 @@ export function Statistics() {
         punten: log?.totalPointsUsed ?? 0,
         budget: profile.dailyPointsBudget,
       });
+      waterDays.push({
+        dag: format(d, 'EEE', { locale: nl }),
+        water: log?.waterMl ?? 0,
+        doel: waterGoal,
+      });
     }
     setWeekData(days);
+    setWaterWeekData(waterDays);
 
     // Maaltijd verdeling (deze week)
     const mealTotals: Record<string, number> = { Ontbijt: 0, Lunch: 0, Diner: 0, Snacks: 0 };
@@ -138,6 +147,23 @@ export function Statistics() {
             <div className="text-[12px] text-ios-secondary">Gemiddeld per dag</div>
           </Card>
         </div>
+
+        {/* Water per dag */}
+        <Card>
+          <CardHeader title="Water per dag" />
+          <div className="px-2 pb-4">
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={waterWeekData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E5EA" />
+                <XAxis dataKey="dag" tick={{ fontSize: 12, fill: '#8E8E93' }} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#8E8E93' }} tickLine={false} tickFormatter={(v) => `${v / 1000}L`} />
+                <Tooltip formatter={(value) => [`${value} ml`, 'Water']} />
+                <ReferenceLine y={profile.waterGoalMl || 2000} stroke="#3B82F6" strokeDasharray="5 5" label={{ value: 'Doel', fontSize: 11, fill: '#3B82F6' }} />
+                <Bar dataKey="water" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
 
         {/* Meal distribution */}
         {mealDistribution.length > 0 && (

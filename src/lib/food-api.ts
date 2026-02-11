@@ -1,6 +1,7 @@
 import type { FoodItem, FoodUnit, NutritionPer100g } from '../types/food';
 import { calculatePointsPer100g } from './points-calculator';
 import { COMMON_DUTCH_FOODS } from './dutch-foods';
+import { isZeroPointFood } from './zero-point-foods';
 import { db } from '../db/database';
 
 const OFF_API_BASE = 'https://nl.openfoodfacts.org';
@@ -62,7 +63,8 @@ function mapToFoodItem(product: OpenFoodFactsProduct): FoodItem | null {
   const nutrition = parseNutrition(product.nutriments);
   if (nutrition.calories === 0 && nutrition.protein === 0 && nutrition.fat === 0) return null;
 
-  const pointsPer100g = calculatePointsPer100g(nutrition);
+  const zeroPoint = isZeroPointFood(name);
+  const pointsPer100g = zeroPoint ? 0 : calculatePointsPer100g(nutrition);
   const unit = detectUnit(product);
 
   return {
@@ -73,7 +75,7 @@ function mapToFoodItem(product: OpenFoodFactsProduct): FoodItem | null {
     pointsPer100g,
     servingSizeG: product.serving_quantity || 100,
     unit,
-    isZeroPoint: pointsPer100g === 0,
+    isZeroPoint: zeroPoint,
     source: 'openfoodfacts',
     imageUrl: product.image_front_small_url || undefined,
     createdAt: new Date(),
@@ -88,11 +90,12 @@ function searchLocalFoods(query: string): FoodItem[] {
   return COMMON_DUTCH_FOODS
     .filter((food) => food.name.toLowerCase().includes(lower))
     .map((food) => {
-      const pointsPer100g = calculatePointsPer100g(food.nutrition);
+      const zeroPoint = isZeroPointFood(food.name);
+      const pointsPer100g = zeroPoint ? 0 : calculatePointsPer100g(food.nutrition);
       return {
         ...food,
         pointsPer100g,
-        isZeroPoint: pointsPer100g === 0,
+        isZeroPoint: zeroPoint,
         source: 'nevo' as const,
         createdAt: new Date(),
       };

@@ -60,5 +60,8 @@ export const ZERO_POINT_FOODS: string[] = ZERO_POINT_CATEGORIES.flatMap((c) => c
 
 export function isZeroPointFood(name: string): boolean {
   const lower = name.toLowerCase();
-  return ZERO_POINT_FOODS.some((food) => lower.includes(food.toLowerCase()));
+  return ZERO_POINT_FOODS.some((food) => {
+    const escaped = food.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`\\b${escaped}\\b`).test(lower);
+  });
 }

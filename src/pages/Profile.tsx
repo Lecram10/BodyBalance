@@ -37,9 +37,9 @@ export function Profile() {
   const [apiUrl, setApiUrl] = useState('');
   const [aiSaved, setAiSaved] = useState(false);
 
-  // Notifications (separate toggles)
-  const [mealReminder, setMealReminder] = useState(false);
-  const [waterReminder, setWaterReminder] = useState(false);
+  // Notifications (separate toggles, persisted in localStorage)
+  const [mealReminder, setMealReminder] = useState(() => localStorage.getItem('bb_meal_reminder') === 'true');
+  const [waterReminder, setWaterReminder] = useState(() => localStorage.getItem('bb_water_reminder') === 'true');
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 
   // Theme
@@ -110,9 +110,6 @@ export function Profile() {
   const checkNotificationPermission = () => {
     if ('Notification' in window) {
       setNotificationPermission(Notification.permission);
-      const granted = Notification.permission === 'granted';
-      setMealReminder(granted);
-      setWaterReminder(granted);
     }
   };
 
@@ -138,19 +135,27 @@ export function Profile() {
   const handleToggleMealReminder = async () => {
     if (mealReminder) {
       setMealReminder(false);
+      localStorage.setItem('bb_meal_reminder', 'false');
       return;
     }
     const granted = await requestNotificationPermission();
-    if (granted) setMealReminder(true);
+    if (granted) {
+      setMealReminder(true);
+      localStorage.setItem('bb_meal_reminder', 'true');
+    }
   };
 
   const handleToggleWaterReminder = async () => {
     if (waterReminder) {
       setWaterReminder(false);
+      localStorage.setItem('bb_water_reminder', 'false');
       return;
     }
     const granted = await requestNotificationPermission();
-    if (granted) setWaterReminder(true);
+    if (granted) {
+      setWaterReminder(true);
+      localStorage.setItem('bb_water_reminder', 'true');
+    }
   };
 
   const handleThemeChange = (newTheme: 'auto' | 'light' | 'dark') => {

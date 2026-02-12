@@ -95,6 +95,67 @@ function UpdatePrompt() {
   );
 }
 
+// Notification scheduler
+const MEAL_TIMES = [
+  { hour: 8, minute: 0, label: 'Tijd om je ontbijt te loggen!' },
+  { hour: 12, minute: 30, label: 'Tijd om je lunch te loggen!' },
+  { hour: 18, minute: 0, label: 'Tijd om je avondeten te loggen!' },
+];
+const WATER_HOURS = [8, 10, 12, 14, 16, 18, 20, 22];
+
+function sendNotification(title: string, body: string) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(title, { body, icon: './icons/icon-192.png' });
+  }
+}
+
+function useNotificationScheduler() {
+  useEffect(() => {
+    const check = () => {
+      const now = new Date();
+      const h = now.getHours();
+      const m = now.getMinutes();
+      const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+
+      // Meal reminders
+      if (localStorage.getItem('bb_meal_reminder') === 'true') {
+        for (const mt of MEAL_TIMES) {
+          if (h === mt.hour && m === mt.minute) {
+            const sentKey = `bb_notif_meal_${mt.hour}_${todayKey}`;
+            if (!localStorage.getItem(sentKey)) {
+              sendNotification('BodyBalance', mt.label);
+              localStorage.setItem(sentKey, '1');
+            }
+          }
+        }
+      }
+
+      // Water reminders
+      if (localStorage.getItem('bb_water_reminder') === 'true') {
+        if (WATER_HOURS.includes(h) && m === 0) {
+          const sentKey = `bb_notif_water_${h}_${todayKey}`;
+          if (!localStorage.getItem(sentKey)) {
+            sendNotification('BodyBalance', 'Vergeet niet water te drinken! 💧');
+            localStorage.setItem(sentKey, '1');
+          }
+        }
+      }
+
+      // Cleanup old sent keys (keep only today)
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key?.startsWith('bb_notif_') && !key.endsWith(todayKey)) {
+          localStorage.removeItem(key);
+        }
+      }
+    };
+
+    check();
+    const interval = setInterval(check, 60_000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
+}
+
 function applyTheme() {
   const stored = localStorage.getItem('bb_theme') || 'auto';
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -121,6 +182,7 @@ function useThemeWatcher() {
 
 function App() {
   useThemeWatcher();
+  useNotificationScheduler();
 
   return (
     <HashRouter>

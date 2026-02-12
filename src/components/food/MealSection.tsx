@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, BookmarkPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { MealEntry, MealType } from '../../types/food';
 import { MEAL_TYPE_LABELS, MEAL_TYPE_ICONS } from '../../types/food';
@@ -9,9 +9,10 @@ interface MealSectionProps {
   entries: MealEntry[];
   totalPoints: number;
   onRemoveEntry: (id: number) => void;
+  onSaveTemplate?: (mealType: MealType) => void;
 }
 
-export function MealSection({ mealType, entries, totalPoints, onRemoveEntry }: MealSectionProps) {
+export function MealSection({ mealType, entries, totalPoints, onRemoveEntry, onSaveTemplate }: MealSectionProps) {
   const navigate = useNavigate();
 
   return (
@@ -24,6 +25,14 @@ export function MealSection({ mealType, entries, totalPoints, onRemoveEntry }: M
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[15px] text-ios-secondary font-medium">{totalPoints} pt</span>
+          {entries.length > 0 && onSaveTemplate && (
+            <button
+              onClick={() => onSaveTemplate(mealType)}
+              className="w-7 h-7 rounded-full bg-ios-bg flex items-center justify-center border-none cursor-pointer active:bg-gray-200 transition-colors"
+            >
+              <BookmarkPlus size={14} className="text-ios-secondary" />
+            </button>
+          )}
           <button
             onClick={() => navigate(`/search?meal=${mealType}`)}
             className="w-7 h-7 rounded-full bg-primary flex items-center justify-center border-none cursor-pointer active:bg-primary-dark transition-colors"

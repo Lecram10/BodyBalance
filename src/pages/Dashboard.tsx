@@ -1,17 +1,42 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useUserStore } from '../store/user-store';
 import { useMealStore } from '../store/meal-store';
-import { getWeeklyPointsUsed, getWaterIntake, addWaterIntake, resetWaterIntake } from '../db/database';
+import { getWeeklyPointsUsed, getWaterIntake, addWaterIntake, resetWaterIntake, copyDayEntries } from '../db/database';
 import { PageLayout } from '../components/layout/PageLayout';
 import { PointsRing } from '../components/points/PointsRing';
 import { MealSection } from '../components/food/MealSection';
 import { Card } from '../components/ui/Card';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Droplets, GlassWater, Coffee, RotateCcw } from 'lucide-react';
-import type { MealType } from '../types/food';
+import { ChevronLeft, ChevronRight, Droplets, GlassWater, Coffee, RotateCcw, Copy, Bookmark } from 'lucide-react';
+import type { FoodItem, MealType } from '../types/food';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+interface MealTemplate {
+  name: string;
+  mealType: MealType;
+  items: { foodItem: FoodItem; quantityG: number; quantity?: number; points: number }[];
+}
+
+function getTemplates(): MealTemplate[] {
+  try {
+    const stored = localStorage.getItem('bb_templates');
+    return stored ? JSON.parse(stored) : [];
+  } catch { return []; }
+}
+
+function saveTemplate(template: MealTemplate) {
+  const templates = getTemplates();
+  templates.push(template);
+  localStorage.setItem('bb_templates', JSON.stringify(templates));
+}
+
+function deleteTemplate(index: number) {
+  const templates = getTemplates();
+  templates.splice(index, 1);
+  localStorage.setItem('bb_templates', JSON.stringify(templates));
+}
 
 export function Dashboard() {
   const profile = useUserStore((s) => s.profile);
@@ -20,6 +45,7 @@ export function Dashboard() {
     selectedDate,
     setDate,
     loadEntries,
+    addEntry,
     removeEntry,
     getEntriesByMealType,
     getTotalPoints,
@@ -29,6 +55,8 @@ export function Dashboard() {
   const [weeklyUsed, setWeeklyUsed] = useState(0);
   const [waterMl, setWaterMl] = useState(0);
   const waterGoal = profile?.waterGoalMl || 2000;
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templates, setTemplates] = useState<MealTemplate[]>(getTemplates);
 
   const loadWater = useCallback(async () => {
     const ml = await getWaterIntake(selectedDate);
@@ -54,11 +82,62 @@ export function Dashboard() {
   const handleAddWater = async (ml: number) => {
     const newTotal = await addWaterIntake(selectedDate, ml);
     setWaterMl(newTotal);
+    navigator.vibrate?.(10);
   };
 
   const handleResetWater = async () => {
     await resetWaterIntake(selectedDate);
     setWaterMl(0);
+  };
+
+  const handleSaveTemplate = (mealType: MealType) => {
+    const mealEntries = getEntriesByMealType(mealType);
+    if (mealEntries.length === 0) return;
+    const name = prompt('Naam voor deze template:');
+    if (!name) return;
+    const template: MealTemplate = {
+      name,
+      mealType,
+      items: mealEntries.map((e) => ({
+        foodItem: e.foodItem,
+        quantityG: e.quantityG,
+        quantity: e.quantity,
+        points: e.points,
+      })),
+    };
+    saveTemplate(template);
+    setTemplates(getTemplates());
+    navigator.vibrate?.(10);
+  };
+
+  const handleLoadTemplate = async (template: MealTemplate) => {
+    for (const item of template.items) {
+      await addEntry({
+        foodItem: item.foodItem,
+        mealType: template.mealType,
+        quantityG: item.quantityG,
+        quantity: item.quantity,
+        points: item.points,
+      });
+    }
+    setShowTemplates(false);
+    navigator.vibrate?.(10);
+  };
+
+  const handleDeleteTemplate = (index: number) => {
+    deleteTemplate(index);
+    setTemplates(getTemplates());
+  };
+
+  const handleCopyPreviousDay = async () => {
+    const prev = new Date(selectedDate);
+    prev.setDate(prev.getDate() - 1);
+    const prevDate = format(prev, 'yyyy-MM-dd');
+    const count = await copyDayEntries(prevDate, selectedDate);
+    if (count > 0) {
+      await loadEntries();
+      navigator.vibrate?.(10);
+    }
   };
 
   if (!profile) return null;
@@ -116,6 +195,56 @@ export function Dashboard() {
           </span>
         </Card>
 
+        {/* Quick actions */}
+        <div className="flex gap-2">
+          {entries.length === 0 && (
+            <button
+              onClick={handleCopyPreviousDay}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white rounded-xl border border-dashed border-ios-separator text-[13px] font-medium text-ios-secondary cursor-pointer active:bg-gray-50 transition-colors"
+            >
+              <Copy size={14} />
+              Kopieer gisteren
+            </button>
+          )}
+          {templates.length > 0 && (
+            <button
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white rounded-xl border border-dashed border-ios-separator text-[13px] font-medium text-ios-blue cursor-pointer active:bg-gray-50 transition-colors"
+            >
+              <Bookmark size={14} />
+              Templates ({templates.length})
+            </button>
+          )}
+        </div>
+
+        {/* Template list */}
+        {showTemplates && (
+          <Card>
+            <div className="px-4 py-2.5 border-b border-ios-separator">
+              <span className="text-[13px] font-semibold text-ios-secondary uppercase tracking-wide">Maaltijd templates</span>
+            </div>
+            {templates.map((t, i) => (
+              <div key={i} className={`flex items-center justify-between px-4 py-2.5 ${i < templates.length - 1 ? 'border-b border-ios-separator' : ''}`}>
+                <button
+                  onClick={() => handleLoadTemplate(t)}
+                  className="flex-1 text-left bg-transparent border-none cursor-pointer p-0"
+                >
+                  <div className="text-[15px] font-medium">{t.name}</div>
+                  <div className="text-[12px] text-ios-secondary">
+                    {t.items.length} items &middot; {t.items.reduce((s, item) => s + item.points, 0)} pt
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleDeleteTemplate(i)}
+                  className="text-[12px] text-ios-destructive bg-transparent border-none cursor-pointer px-2 py-1"
+                >
+                  Wis
+                </button>
+              </div>
+            ))}
+          </Card>
+        )}
+
         {/* Meal sections */}
         {MEAL_TYPES.map((type) => (
           <MealSection
@@ -124,6 +253,7 @@ export function Dashboard() {
             entries={getEntriesByMealType(type)}
             totalPoints={getPointsByMealType(type)}
             onRemoveEntry={removeEntry}
+            onSaveTemplate={handleSaveTemplate}
           />
         ))}
 

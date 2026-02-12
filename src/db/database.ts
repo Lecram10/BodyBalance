@@ -243,3 +243,24 @@ export async function resetWaterIntake(date: string): Promise<void> {
     await db.dailyLogs.update(log.id, { waterMl: 0 });
   }
 }
+
+/**
+ * Kopieer alle maaltijden van een brondag naar een doeldatum.
+ * Retourneert het aantal gekopieerde entries.
+ */
+export async function copyDayEntries(fromDate: string, toDate: string): Promise<number> {
+  const sourceEntries = await getMealEntriesForDate(fromDate);
+  if (sourceEntries.length === 0) return 0;
+
+  for (const entry of sourceEntries) {
+    await addMealEntry(toDate, {
+      foodItem: entry.foodItem,
+      mealType: entry.mealType,
+      quantityG: entry.quantityG,
+      quantity: entry.quantity,
+      points: entry.points,
+    });
+  }
+
+  return sourceEntries.length;
+}

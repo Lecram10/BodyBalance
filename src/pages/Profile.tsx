@@ -14,7 +14,7 @@ import type { Gender, ActivityLevel, Goal } from '../types/user';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle } from 'lucide-react';
+import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor } from 'lucide-react';
 
 export function Profile() {
   const navigate = useNavigate();
@@ -41,6 +41,11 @@ export function Profile() {
   const [mealReminder, setMealReminder] = useState(false);
   const [waterReminder, setWaterReminder] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+
+  // Theme
+  const [theme, setTheme] = useState<'auto' | 'light' | 'dark'>(() => {
+    return (localStorage.getItem('bb_theme') as 'auto' | 'light' | 'dark') || 'auto';
+  });
 
   // Export/import
   const [exportStatus, setExportStatus] = useState<string | null>(null);
@@ -146,6 +151,12 @@ export function Profile() {
     }
     const granted = await requestNotificationPermission();
     if (granted) setWaterReminder(true);
+  };
+
+  const handleThemeChange = (newTheme: 'auto' | 'light' | 'dark') => {
+    setTheme(newTheme);
+    localStorage.setItem('bb_theme', newTheme);
+    window.dispatchEvent(new Event('themechange'));
   };
 
   const handleExportData = async () => {
@@ -517,6 +528,42 @@ export function Profile() {
                   }`}
                 >
                   {ml / 1000}L
+                </button>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        {/* Weergave */}
+        <Card>
+          <CardHeader title="Weergave" />
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {theme === 'dark' ? (
+                <Moon size={20} className="text-ios-blue" />
+              ) : theme === 'light' ? (
+                <Sun size={20} className="text-ios-warning" />
+              ) : (
+                <Monitor size={20} className="text-ios-secondary" />
+              )}
+              <span className="text-[15px]">Thema</span>
+            </div>
+            <div className="flex items-center gap-1">
+              {([
+                { key: 'auto', label: 'Auto' },
+                { key: 'light', label: 'Licht' },
+                { key: 'dark', label: 'Donker' },
+              ] as const).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => handleThemeChange(key)}
+                  className={`px-3 py-1 rounded-lg text-[13px] font-medium border-none cursor-pointer transition-colors ${
+                    theme === key
+                      ? 'bg-ios-blue text-white'
+                      : 'bg-ios-bg text-ios-text active:bg-gray-200'
+                  }`}
+                >
+                  {label}
                 </button>
               ))}
             </div>

@@ -95,7 +95,33 @@ function UpdatePrompt() {
   );
 }
 
+function applyTheme() {
+  const stored = localStorage.getItem('bb_theme') || 'auto';
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const shouldBeDark = stored === 'dark' || (stored === 'auto' && prefersDark);
+  document.documentElement.classList.toggle('dark', shouldBeDark);
+}
+
+function useThemeWatcher() {
+  useEffect(() => {
+    applyTheme();
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = () => applyTheme();
+    mq.addEventListener('change', handler);
+    // Also listen for storage changes (from Profile toggle)
+    window.addEventListener('storage', handler);
+    window.addEventListener('themechange', handler);
+    return () => {
+      mq.removeEventListener('change', handler);
+      window.removeEventListener('storage', handler);
+      window.removeEventListener('themechange', handler);
+    };
+  }, []);
+}
+
 function App() {
+  useThemeWatcher();
+
   return (
     <HashRouter>
       <OfflineBanner />

@@ -105,8 +105,9 @@ function searchLocalFoods(query: string): FoodItem[] {
 /**
  * Zoek voedingsmiddelen via Open Food Facts API (NL producten).
  * Zoekt eerst in lokale NL database, dan via API met country filter.
+ * Ondersteunt AbortSignal om verouderde requests te annuleren.
  */
-export async function searchFood(query: string): Promise<FoodItem[]> {
+export async function searchFood(query: string, signal?: AbortSignal): Promise<FoodItem[]> {
   if (!query || query.length < 2) return [];
 
   // Stap 1: zoek in lokale NL voedingsmiddelen
@@ -127,8 +128,22 @@ export async function searchFood(query: string): Promise<FoodItem[]> {
       tag_0: 'Netherlands',
     });
 
-    const response = await fetch(`${OFF_API_BASE}/cgi/search.pl?${params}`);
+    // Start NL en World zoekopdrachten parallel
+    const nlFetch = fetch(`${OFF_API_BASE}/cgi/search.pl?${params}`, { signal });
 
+    const fallbackParams = new URLSearchParams({
+      search_terms: query,
+      search_simple: '1',
+      action: 'process',
+      json: '1',
+      page_size: '10',
+      fields: 'product_name,product_name_nl,brands,code,nutriments,serving_quantity,serving_size,quantity,image_front_small_url',
+      lc: 'nl',
+    });
+    const worldFetch = fetch(`https://world.openfoodfacts.org/cgi/search.pl?${fallbackParams}`, { signal });
+
+    // Wacht op NL resultaten
+    const response = await nlFetch;
     if (!response.ok) return localResults;
 
     const data = await response.json();
@@ -138,37 +153,29 @@ export async function searchFood(query: string): Promise<FoodItem[]> {
       .map(mapToFoodItem)
       .filter((item): item is FoodItem => item !== null);
 
-    // Stap 3: als weinig NL resultaten, zoek ook wereldwijd als fallback
+    // Stap 3: als weinig NL resultaten, gebruik de al gestarte world fallback
     if (apiResults.length < 3) {
-      const fallbackParams = new URLSearchParams({
-        search_terms: query,
-        search_simple: '1',
-        action: 'process',
-        json: '1',
-        page_size: '10',
-        fields: 'product_name,product_name_nl,brands,code,nutriments,serving_quantity,serving_size,quantity,image_front_small_url',
-        lc: 'nl',
-      });
+      try {
+        const fallbackResponse = await worldFetch;
 
-      const fallbackResponse = await fetch(
-        `https://world.openfoodfacts.org/cgi/search.pl?${fallbackParams}`
-      );
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          const fallbackProducts: OpenFoodFactsProduct[] = fallbackData.products || [];
+          const fallbackItems = fallbackProducts
+            .map(mapToFoodItem)
+            .filter((item): item is FoodItem => item !== null);
 
-      if (fallbackResponse.ok) {
-        const fallbackData = await fallbackResponse.json();
-        const fallbackProducts: OpenFoodFactsProduct[] = fallbackData.products || [];
-        const fallbackItems = fallbackProducts
-          .map(mapToFoodItem)
-          .filter((item): item is FoodItem => item !== null);
-
-        // Voeg toe zonder duplicaten (op basis van barcode of naam)
-        const existingNames = new Set(apiResults.map((r) => r.name.toLowerCase()));
-        for (const item of fallbackItems) {
-          if (!existingNames.has(item.name.toLowerCase())) {
-            apiResults.push(item);
-            existingNames.add(item.name.toLowerCase());
+          // Voeg toe zonder duplicaten (op basis van barcode of naam)
+          const existingNames = new Set(apiResults.map((r) => r.name.toLowerCase()));
+          for (const item of fallbackItems) {
+            if (!existingNames.has(item.name.toLowerCase())) {
+              apiResults.push(item);
+              existingNames.add(item.name.toLowerCase());
+            }
           }
         }
+      } catch {
+        // World fallback gefaald, ga door met NL resultaten
       }
     }
 
@@ -184,6 +191,9 @@ export async function searchFood(query: string): Promise<FoodItem[]> {
 
     return combined;
   } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return []; // Request geannuleerd, geen resultaten nodig
+    }
     console.error('Zoekfout:', error);
     return localResults;
   }

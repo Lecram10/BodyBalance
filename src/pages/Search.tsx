@@ -32,6 +32,7 @@ export function Search() {
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const addEntry = useMealStore((s) => s.addEntry);
 
@@ -57,17 +58,33 @@ export function Search() {
       setHasSearched(false);
       return;
     }
+
+    // Annuleer vorige zoekopdracht
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsSearching(true);
-    const items = await searchFood(q);
-    // Markeer favorieten in zoekresultaten
-    const favNames = new Set(favoriteFoods.map((f) => f.name.toLowerCase()));
-    const marked = items.map((item) => ({
-      ...item,
-      isFavorite: favNames.has(item.name.toLowerCase()),
-    }));
-    setSearchResults(marked);
-    setIsSearching(false);
-    setHasSearched(true);
+    try {
+      const items = await searchFood(q, controller.signal);
+      // Alleen updaten als dit request niet geannuleerd is
+      if (!controller.signal.aborted) {
+        const favNames = new Set(favoriteFoods.map((f) => f.name.toLowerCase()));
+        const marked = items.map((item) => ({
+          ...item,
+          isFavorite: favNames.has(item.name.toLowerCase()),
+        }));
+        setSearchResults(marked);
+        setIsSearching(false);
+        setHasSearched(true);
+      }
+    } catch {
+      if (!controller.signal.aborted) {
+        setIsSearching(false);
+      }
+    }
   }, [favoriteFoods]);
 
   const handleQueryChange = (value: string) => {
@@ -76,7 +93,7 @@ export function Search() {
       setActiveTab('search');
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => doSearch(value), 400);
+    debounceRef.current = setTimeout(() => doSearch(value), 300);
   };
 
   const handleToggleFavorite = async (food: FoodItem) => {

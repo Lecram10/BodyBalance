@@ -129,6 +129,7 @@ export function Search() {
       points,
     });
 
+    navigator.vibrate?.(10);
     setSelectedFood(null);
     // Herlaad recent na toevoegen
     const recent = await getRecentFoods();

@@ -12,8 +12,27 @@ interface AddFoodModalProps {
   onClose: () => void;
 }
 
+function getLastPortion(foodName: string): number | null {
+  try {
+    const stored = localStorage.getItem('bb_portions');
+    if (!stored) return null;
+    const map = JSON.parse(stored) as Record<string, number>;
+    return map[foodName.toLowerCase()] ?? null;
+  } catch { return null; }
+}
+
+function saveLastPortion(foodName: string, g: number) {
+  try {
+    const stored = localStorage.getItem('bb_portions');
+    const map: Record<string, number> = stored ? JSON.parse(stored) : {};
+    map[foodName.toLowerCase()] = g;
+    localStorage.setItem('bb_portions', JSON.stringify(map));
+  } catch { /* ignore */ }
+}
+
 export function AddFoodModal({ food, defaultMealType, onAdd, onClose }: AddFoodModalProps) {
-  const [quantityG, setQuantityG] = useState(food.servingSizeG || 100);
+  const remembered = getLastPortion(food.name);
+  const [quantityG, setQuantityG] = useState(remembered ?? (food.servingSizeG || 100));
   const [quantity, setQuantity] = useState(1);
   const [mealType, setMealType] = useState<MealType>(defaultMealType);
 
@@ -203,7 +222,10 @@ export function AddFoodModal({ food, defaultMealType, onAdd, onClose }: AddFoodM
           </div>
 
           {/* Add button */}
-          <Button fullWidth size="lg" onClick={() => onAdd(quantityG, mealType, quantity > 1 ? quantity : undefined)}>
+          <Button fullWidth size="lg" onClick={() => {
+            saveLastPortion(food.name, quantityG);
+            onAdd(quantityG, mealType, quantity > 1 ? quantity : undefined);
+          }}>
             Toevoegen — {points} pt{quantity > 1 ? ` (${quantity}×)` : ''}
           </Button>
         </div>

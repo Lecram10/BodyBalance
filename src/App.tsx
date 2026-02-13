@@ -117,10 +117,10 @@ function useNotificationScheduler() {
       const m = now.getMinutes();
       const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 
-      // Meal reminders
+      // Meal reminders - fire if we're in the same hour and past the scheduled minute
       if (localStorage.getItem('bb_meal_reminder') === 'true') {
         for (const mt of MEAL_TIMES) {
-          if (h === mt.hour && m === mt.minute) {
+          if (h === mt.hour && m >= mt.minute) {
             const sentKey = `bb_notif_meal_${mt.hour}_${todayKey}`;
             if (!localStorage.getItem(sentKey)) {
               sendNotification('BodyBalance', mt.label);
@@ -130,12 +130,12 @@ function useNotificationScheduler() {
         }
       }
 
-      // Water reminders
+      // Water reminders - fire anytime during the scheduled hour
       if (localStorage.getItem('bb_water_reminder') === 'true') {
-        if (WATER_HOURS.includes(h) && m === 0) {
+        if (WATER_HOURS.includes(h)) {
           const sentKey = `bb_notif_water_${h}_${todayKey}`;
           if (!localStorage.getItem(sentKey)) {
-            sendNotification('BodyBalance', 'Vergeet niet water te drinken! 💧');
+            sendNotification('BodyBalance', 'Vergeet niet water te drinken!');
             localStorage.setItem(sentKey, '1');
           }
         }

@@ -6,7 +6,7 @@ import { AddFoodModal } from '../components/food/AddFoodModal';
 import { CreateFoodModal } from '../components/food/CreateFoodModal';
 import { Card } from '../components/ui/Card';
 import { RecipeBuilderModal } from '../components/food/RecipeBuilderModal';
-import { searchFood } from '../lib/food-api';
+import { searchFood, searchLocalFoods, searchUserFoods } from '../lib/food-api';
 import { calculatePointsForQuantity } from '../lib/points-calculator';
 import { getRecentFoods, getFavoriteFoods, toggleFavorite } from '../db/database';
 import { useMealStore } from '../store/meal-store';
@@ -66,17 +66,34 @@ export function Search() {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    const favNames = new Set(favoriteFoods.map((f) => f.name.toLowerCase()));
+    const markFavs = (items: FoodItem[]) => items.map((item) => ({
+      ...item,
+      isFavorite: favNames.has(item.name.toLowerCase()),
+    }));
+
+    // Stap 1: Toon lokale + eigen producten direct
+    const localResults = searchLocalFoods(q);
+    const userResults = await searchUserFoods(q);
+    const existingNames = new Set(localResults.map((r) => r.name.toLowerCase()));
+    const combined = [...localResults];
+    for (const item of userResults) {
+      if (!existingNames.has(item.name.toLowerCase())) {
+        combined.push(item);
+        existingNames.add(item.name.toLowerCase());
+      }
+    }
+    if (!controller.signal.aborted && combined.length > 0) {
+      setSearchResults(markFavs(combined));
+      setHasSearched(true);
+    }
+
+    // Stap 2: API resultaten ophalen (kan traag zijn)
     setIsSearching(true);
     try {
       const items = await searchFood(q, controller.signal);
-      // Alleen updaten als dit request niet geannuleerd is
       if (!controller.signal.aborted) {
-        const favNames = new Set(favoriteFoods.map((f) => f.name.toLowerCase()));
-        const marked = items.map((item) => ({
-          ...item,
-          isFavorite: favNames.has(item.name.toLowerCase()),
-        }));
-        setSearchResults(marked);
+        setSearchResults(markFavs(items));
         setIsSearching(false);
         setHasSearched(true);
       }

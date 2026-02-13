@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { MealEntry, MealType } from '../types/food';
-import { getMealEntriesForDate, addMealEntry, removeMealEntry } from '../db/database';
+import { getMealEntriesForDate, addMealEntry, removeMealEntry, updateMealEntry } from '../db/database';
 import { format } from 'date-fns';
 
 interface MealState {
@@ -10,6 +10,7 @@ interface MealState {
   setDate: (date: string) => void;
   loadEntries: () => Promise<void>;
   addEntry: (entry: Omit<MealEntry, 'id' | 'dailyLogId' | 'loggedAt'>) => Promise<void>;
+  updateEntry: (id: number, updates: { quantityG: number; quantity?: number; points: number }) => Promise<void>;
   removeEntry: (id: number) => Promise<void>;
   getEntriesByMealType: (mealType: MealType) => MealEntry[];
   getTotalPoints: () => number;
@@ -34,6 +35,11 @@ export const useMealStore = create<MealState>((set, get) => ({
 
   addEntry: async (entry) => {
     await addMealEntry(get().selectedDate, entry);
+    await get().loadEntries();
+  },
+
+  updateEntry: async (id, updates) => {
+    await updateMealEntry(id, updates);
     await get().loadEntries();
   },
 

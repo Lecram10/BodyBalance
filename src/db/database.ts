@@ -75,6 +75,27 @@ export async function addMealEntry(
   });
 }
 
+// Helper: update een bestaande maaltijdentry (aantal, hoeveelheid, punten)
+export async function updateMealEntry(
+  entryId: number,
+  updates: { quantityG: number; quantity?: number; points: number }
+): Promise<void> {
+  const entry = await db.mealEntries.get(entryId);
+  if (!entry) return;
+
+  await db.mealEntries.update(entryId, updates);
+
+  // Herbereken daglog totaal
+  if (entry.dailyLogId) {
+    const entries = await db.mealEntries
+      .where('dailyLogId')
+      .equals(entry.dailyLogId)
+      .toArray();
+    const totalPoints = entries.reduce((sum, e) => sum + (e.id === entryId ? updates.points : e.points), 0);
+    await db.dailyLogs.update(entry.dailyLogId, { totalPointsUsed: totalPoints });
+  }
+}
+
 // Helper: verwijder maaltijdentry en update daglog
 export async function removeMealEntry(entryId: number): Promise<void> {
   const entry = await db.mealEntries.get(entryId);

@@ -9,10 +9,11 @@ interface MealSectionProps {
   entries: MealEntry[];
   totalPoints: number;
   onRemoveEntry: (id: number) => void;
+  onEditEntry?: (entry: MealEntry) => void;
   onSaveTemplate?: (mealType: MealType) => void;
 }
 
-export function MealSection({ mealType, entries, totalPoints, onRemoveEntry, onSaveTemplate }: MealSectionProps) {
+export function MealSection({ mealType, entries, totalPoints, onRemoveEntry, onEditEntry, onSaveTemplate }: MealSectionProps) {
   const navigate = useNavigate();
 
   return (
@@ -50,7 +51,8 @@ export function MealSection({ mealType, entries, totalPoints, onRemoveEntry, onS
               key={entry.id ?? index}
               className={`flex items-center justify-between px-4 py-2.5 ${
                 index < entries.length - 1 ? 'border-b border-ios-separator' : ''
-              }`}
+              } ${onEditEntry ? 'cursor-pointer active:bg-gray-50' : ''}`}
+              onClick={() => onEditEntry?.(entry)}
             >
               <div className="flex-1 min-w-0">
                 <div className="text-[15px] truncate">{entry.foodItem.name}</div>

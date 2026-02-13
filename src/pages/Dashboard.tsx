@@ -6,11 +6,12 @@ import type { WeekSummary } from '../db/database';
 import { PageLayout } from '../components/layout/PageLayout';
 import { PointsRing } from '../components/points/PointsRing';
 import { MealSection } from '../components/food/MealSection';
+import { EditEntryModal } from '../components/food/EditEntryModal';
 import { Card } from '../components/ui/Card';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Droplets, GlassWater, Coffee, RotateCcw, Copy, Bookmark, X, Flame, Trophy, TrendingDown, TrendingUp, Minus } from 'lucide-react';
-import type { FoodItem, MealType } from '../types/food';
+import type { FoodItem, MealEntry, MealType } from '../types/food';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -47,6 +48,7 @@ export function Dashboard() {
     setDate,
     loadEntries,
     addEntry,
+    updateEntry,
     removeEntry,
     getEntriesByMealType,
     getTotalPoints,
@@ -61,6 +63,7 @@ export function Dashboard() {
   const [streak, setStreak] = useState(0);
   const [weekReport, setWeekReport] = useState<WeekSummary | null>(null);
   const [showWeekReport, setShowWeekReport] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<MealEntry | null>(null);
 
   const loadWater = useCallback(async () => {
     const ml = await getWaterIntake(selectedDate);
@@ -407,6 +410,7 @@ export function Dashboard() {
             entries={getEntriesByMealType(type)}
             totalPoints={getPointsByMealType(type)}
             onRemoveEntry={removeEntry}
+            onEditEntry={setEditingEntry}
             onSaveTemplate={handleSaveTemplate}
           />
         ))}
@@ -478,6 +482,19 @@ export function Dashboard() {
           </div>
         </Card>
       </div>
+
+      {/* Edit entry modal */}
+      {editingEntry && (
+        <EditEntryModal
+          entry={editingEntry}
+          onSave={(id, updates) => {
+            updateEntry(id, updates);
+            setEditingEntry(null);
+            navigator.vibrate?.(10);
+          }}
+          onClose={() => setEditingEntry(null)}
+        />
+      )}
     </PageLayout>
   );
 }

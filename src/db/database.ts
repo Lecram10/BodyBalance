@@ -264,3 +264,135 @@ export async function copyDayEntries(fromDate: string, toDate: string): Promise<
 
   return sourceEntries.length;
 }
+
+/**
+ * Weekrapport: samenvatting van de vorige week (ma-zo).
+ */
+export interface WeekSummary {
+  weekLabel: string;           // bijv. "Week 6 · 3-9 feb"
+  avgPoints: number;           // gemiddelde punten per dag
+  dailyBudget: number;
+  daysWithinBudget: number;    // dagen onder dagbudget
+  totalDays: number;           // dagen met data
+  waterDaysOnTarget: number;   // dagen waterdoel gehaald
+  waterTotalDays: number;
+  weightChange: number | null; // kg verschil (null als geen data)
+  bestDay: string | null;      // naam van dag met laagste punten
+  bestDayPoints: number;
+  weeklyPointsUsed: number;    // weekpunten verbruikt
+  weeklyPointsBudget: number;
+}
+
+export async function getWeekSummary(
+  dailyBudget: number,
+  weeklyBudget: number,
+  waterGoalMl: number
+): Promise<WeekSummary | null> {
+  // Vorige week: ma-zo
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=zo, 1=ma
+  const daysBack = dayOfWeek === 0 ? 7 : dayOfWeek + 6; // terug naar vorige maandag
+  const prevMonday = new Date(now);
+  prevMonday.setDate(now.getDate() - daysBack);
+
+  let totalPoints = 0;
+  let totalDays = 0;
+  let daysWithinBudget = 0;
+  let waterDaysOnTarget = 0;
+  let waterTotalDays = 0;
+  let bestDay: string | null = null;
+  let bestDayPoints = Infinity;
+  let weeklyOverage = 0;
+
+  const dayNames = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(prevMonday);
+    d.setDate(prevMonday.getDate() + i);
+    const dateStr = d.toISOString().split('T')[0];
+    const log = await db.dailyLogs.where('date').equals(dateStr).first();
+
+    if (log) {
+      const pts = log.totalPointsUsed;
+      totalPoints += pts;
+      totalDays++;
+      if (pts <= dailyBudget) daysWithinBudget++;
+      if (pts > dailyBudget) weeklyOverage += pts - dailyBudget;
+      if (pts < bestDayPoints) {
+        bestDayPoints = pts;
+        bestDay = dayNames[d.getDay()];
+      }
+      if ((log.waterMl ?? 0) > 0) waterTotalDays++;
+      if ((log.waterMl ?? 0) >= waterGoalMl) waterDaysOnTarget++;
+    }
+  }
+
+  if (totalDays === 0) return null;
+
+  // Gewichtsverandering
+  const mondayStr = prevMonday.toISOString().split('T')[0];
+  const sunday = new Date(prevMonday);
+  sunday.setDate(prevMonday.getDate() + 6);
+  const sundayStr = sunday.toISOString().split('T')[0];
+
+  const weightStart = await db.weightEntries.where('date').aboveOrEqual(mondayStr).and(w => w.date <= sundayStr).first();
+  const weightEnd = await db.weightEntries.where('date').belowOrEqual(sundayStr).and(w => w.date >= mondayStr).reverse().first();
+  const weightChange = weightStart && weightEnd && weightStart.date !== weightEnd.date
+    ? weightEnd.weightKg - weightStart.weightKg
+    : null;
+
+  // Week label
+  const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+  const weekNum = getISOWeekNumber(prevMonday);
+  const weekLabel = `Week ${weekNum} · ${prevMonday.getDate()}-${sunday.getDate()} ${months[sunday.getMonth()]}`;
+
+  return {
+    weekLabel,
+    avgPoints: Math.round(totalPoints / totalDays),
+    dailyBudget,
+    daysWithinBudget,
+    totalDays,
+    waterDaysOnTarget,
+    waterTotalDays,
+    weightChange,
+    bestDay,
+    bestDayPoints: bestDayPoints === Infinity ? 0 : bestDayPoints,
+    weeklyPointsUsed: weeklyOverage,
+    weeklyPointsBudget: weeklyBudget,
+  };
+}
+
+function getISOWeekNumber(d: Date): number {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+/**
+ * Bereken de huidige streak: aaneengesloten dagen (vanaf gisteren terug)
+ * waar minstens 1 maaltijd is gelogd en het dagbudget niet overschreden is.
+ */
+export async function calculateStreak(dailyBudget: number): Promise<number> {
+  let streak = 0;
+  const today = new Date();
+
+  // Start bij gisteren (vandaag is nog bezig)
+  for (let i = 1; i <= 365; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+
+    const log = await db.dailyLogs.where('date').equals(dateStr).first();
+
+    // Geen log of geen maaltijden → streak gebroken
+    if (!log || log.totalPointsUsed === 0) break;
+
+    // Over budget → streak gebroken
+    if (log.totalPointsUsed > dailyBudget) break;
+
+    streak++;
+  }
+
+  return streak;
+}

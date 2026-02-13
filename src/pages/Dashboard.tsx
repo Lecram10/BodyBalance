@@ -1,14 +1,15 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useUserStore } from '../store/user-store';
 import { useMealStore } from '../store/meal-store';
-import { getWeeklyPointsUsed, getWaterIntake, addWaterIntake, resetWaterIntake, copyDayEntries } from '../db/database';
+import { getWeeklyPointsUsed, getWaterIntake, addWaterIntake, resetWaterIntake, copyDayEntries, getWeekSummary, calculateStreak } from '../db/database';
+import type { WeekSummary } from '../db/database';
 import { PageLayout } from '../components/layout/PageLayout';
 import { PointsRing } from '../components/points/PointsRing';
 import { MealSection } from '../components/food/MealSection';
 import { Card } from '../components/ui/Card';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Droplets, GlassWater, Coffee, RotateCcw, Copy, Bookmark } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Droplets, GlassWater, Coffee, RotateCcw, Copy, Bookmark, X, Flame, Trophy, TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import type { FoodItem, MealType } from '../types/food';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -57,6 +58,9 @@ export function Dashboard() {
   const waterGoal = profile?.waterGoalMl || 2000;
   const [showTemplates, setShowTemplates] = useState(false);
   const [templates, setTemplates] = useState<MealTemplate[]>(getTemplates);
+  const [streak, setStreak] = useState(0);
+  const [weekReport, setWeekReport] = useState<WeekSummary | null>(null);
+  const [showWeekReport, setShowWeekReport] = useState(false);
 
   const loadWater = useCallback(async () => {
     const ml = await getWaterIntake(selectedDate);
@@ -78,6 +82,38 @@ export function Dashboard() {
   useEffect(() => {
     loadWater();
   }, [loadWater]);
+
+  // Laad streak
+  useEffect(() => {
+    if (profile) {
+      calculateStreak(profile.dailyPointsBudget).then(setStreak);
+    }
+  }, [profile, entries]);
+
+  // Weekrapport: toon op maandag (of eerste keer na zondag)
+  useEffect(() => {
+    if (!profile) return;
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    // Bereken vorige week maandag voor de dismissed key
+    const daysBack = dayOfWeek === 0 ? 7 : dayOfWeek + 6;
+    const prevMonday = new Date(now);
+    prevMonday.setDate(now.getDate() - daysBack);
+    const weekKey = `bb_weekreport_${prevMonday.toISOString().split('T')[0]}`;
+
+    if (!localStorage.getItem(weekKey)) {
+      getWeekSummary(
+        profile.dailyPointsBudget,
+        profile.weeklyPointsBudget,
+        profile.waterGoalMl || 2000
+      ).then((summary) => {
+        if (summary && summary.totalDays >= 3) {
+          setWeekReport(summary);
+          setShowWeekReport(true);
+        }
+      });
+    }
+  }, [profile]);
 
   const handleAddWater = async (ml: number) => {
     const newTotal = await addWaterIntake(selectedDate, ml);
@@ -127,6 +163,20 @@ export function Dashboard() {
   const handleDeleteTemplate = (index: number) => {
     deleteTemplate(index);
     setTemplates(getTemplates());
+  };
+
+  const handleDismissWeekReport = () => {
+    setShowWeekReport(false);
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const daysBack = dayOfWeek === 0 ? 7 : dayOfWeek + 6;
+    const prevMonday = new Date(now);
+    prevMonday.setDate(now.getDate() - daysBack);
+    localStorage.setItem(`bb_weekreport_${prevMonday.toISOString().split('T')[0]}`, '1');
+  };
+
+  const handleDismissStreakMilestone = (milestone: number) => {
+    localStorage.setItem(`bb_streak_milestone_${milestone}`, '1');
   };
 
   const handleCopyPreviousDay = async () => {
@@ -179,10 +229,114 @@ export function Dashboard() {
           </button>
         </div>
 
-        {/* Points Ring */}
-        <Card className="py-6 flex justify-center">
+        {/* Week Report */}
+        {showWeekReport && weekReport && (
+          <Card>
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Trophy size={18} className="text-ios-blue" />
+                  <span className="text-[15px] font-semibold">{weekReport.weekLabel}</span>
+                </div>
+                <button
+                  onClick={handleDismissWeekReport}
+                  className="w-7 h-7 rounded-full bg-transparent border-none cursor-pointer flex items-center justify-center active:bg-gray-100"
+                >
+                  <X size={16} className="text-ios-secondary" />
+                </button>
+              </div>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[14px] text-ios-secondary">Punten</span>
+                  <span className="text-[14px] font-medium">
+                    gem. {weekReport.avgPoints}/{weekReport.dailyBudget} pt
+                    {weekReport.avgPoints <= weekReport.dailyBudget
+                      ? <span className="text-primary ml-1">&#10003;</span>
+                      : <span className="text-ios-destructive ml-1">&#10007;</span>}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[14px] text-ios-secondary">Binnen budget</span>
+                  <span className="text-[14px] font-medium">
+                    {weekReport.daysWithinBudget} van {weekReport.totalDays} dagen
+                    {weekReport.daysWithinBudget >= weekReport.totalDays - 1
+                      ? <span className="text-primary ml-1">&#10003;</span>
+                      : null}
+                  </span>
+                </div>
+                {weekReport.waterTotalDays > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[14px] text-ios-secondary">Water</span>
+                    <span className="text-[14px] font-medium">
+                      {weekReport.waterDaysOnTarget} van {weekReport.waterTotalDays} dagen doel
+                      {weekReport.waterDaysOnTarget >= weekReport.waterTotalDays - 1
+                        ? <span className="text-blue-500 ml-1">&#10003;</span>
+                        : null}
+                    </span>
+                  </div>
+                )}
+                {weekReport.weightChange !== null && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[14px] text-ios-secondary">Gewicht</span>
+                    <span className={`text-[14px] font-medium flex items-center gap-1 ${weekReport.weightChange < 0 ? 'text-primary' : weekReport.weightChange > 0 ? 'text-ios-warning' : ''}`}>
+                      {weekReport.weightChange < 0 ? <TrendingDown size={14} /> : weekReport.weightChange > 0 ? <TrendingUp size={14} /> : <Minus size={14} />}
+                      {weekReport.weightChange > 0 ? '+' : ''}{weekReport.weightChange.toFixed(1)} kg
+                    </span>
+                  </div>
+                )}
+                <div className="border-t border-ios-separator mt-1 pt-2 flex items-center justify-between">
+                  <span className="text-[14px] text-ios-secondary">Beste dag</span>
+                  <span className="text-[14px] font-medium">{weekReport.bestDay} ({weekReport.bestDayPoints} pt)</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[14px] text-ios-secondary">Weekpunten</span>
+                  <span className="text-[14px] font-medium">{weekReport.weeklyPointsUsed} van {weekReport.weeklyPointsBudget} gebruikt</span>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Points Ring + Streak */}
+        <Card className="py-6 flex flex-col items-center gap-2">
           <PointsRing used={totalUsed} budget={profile.dailyPointsBudget} />
+          {streak > 0 && (
+            <div className="flex items-center gap-1.5 mt-1">
+              <Flame size={16} className="text-orange-500" />
+              <span className="text-[14px] font-medium text-ios-secondary">{streak} {streak === 1 ? 'dag' : 'dagen'} op rij</span>
+            </div>
+          )}
         </Card>
+
+        {/* Streak milestone */}
+        {(() => {
+          const milestones = [7, 14, 30, 60, 100];
+          const milestone = milestones.find(m => streak === m && !localStorage.getItem(`bb_streak_milestone_${m}`));
+          if (!milestone) return null;
+          const messages: Record<number, string> = {
+            7: '1 week op rij binnen budget!',
+            14: '2 weken op rij binnen budget!',
+            30: '1 maand op rij! Ongelooflijk!',
+            60: '2 maanden op rij! Wat een discipline!',
+            100: '100 dagen! Je bent een kampioen!',
+          };
+          return (
+            <Card className="bg-primary/10 border border-primary/20">
+              <div className="px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[16px]">&#127881;</span>
+                  <span className="text-[14px] font-semibold text-primary">{messages[milestone]}</span>
+                </div>
+                <button
+                  onClick={() => handleDismissStreakMilestone(milestone)}
+                  className="w-6 h-6 rounded-full bg-transparent border-none cursor-pointer flex items-center justify-center"
+                >
+                  <X size={14} className="text-primary" />
+                </button>
+              </div>
+            </Card>
+          );
+        })()}
 
         {/* Weekly points info */}
         <Card className="px-4 py-3 flex items-center justify-between">

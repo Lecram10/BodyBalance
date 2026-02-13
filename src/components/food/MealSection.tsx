@@ -51,7 +51,7 @@ export function MealSection({ mealType, entries, totalPoints, onRemoveEntry, onE
               key={entry.id ?? index}
               className={`flex items-center justify-between px-4 py-2.5 ${
                 index < entries.length - 1 ? 'border-b border-ios-separator' : ''
-              } ${onEditEntry ? 'cursor-pointer active:bg-gray-50' : ''}`}
+              } ${onEditEntry ? 'cursor-pointer' : ''}`}
               onClick={() => onEditEntry?.(entry)}
             >
               <div className="flex-1 min-w-0">

@@ -85,7 +85,7 @@ function mapToFoodItem(product: OpenFoodFactsProduct): FoodItem | null {
 /**
  * Zoek in de lokale database van generieke Nederlandse voedingsmiddelen.
  */
-function searchLocalFoods(query: string): FoodItem[] {
+export function searchLocalFoods(query: string): FoodItem[] {
   const lower = query.toLowerCase();
   return COMMON_DUTCH_FOODS
     .filter((food) => food.name.toLowerCase().includes(lower))
@@ -100,6 +100,15 @@ function searchLocalFoods(query: string): FoodItem[] {
         createdAt: new Date(),
       };
     });
+}
+
+/**
+ * Zoek in eigen producten (IndexedDB).
+ */
+export async function searchUserFoods(query: string): Promise<FoodItem[]> {
+  const lower = query.toLowerCase();
+  const allUser = await db.foodItems.toArray();
+  return allUser.filter((f) => f.name.toLowerCase().includes(lower));
 }
 
 /**

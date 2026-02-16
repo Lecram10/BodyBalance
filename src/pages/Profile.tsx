@@ -14,7 +14,8 @@ import type { Gender, ActivityLevel, Goal } from '../types/user';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor } from 'lucide-react';
+import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor, LogOut } from 'lucide-react';
+import { useAuthStore } from '../store/auth-store';
 
 export function Profile() {
   const navigate = useNavigate();
@@ -662,6 +663,17 @@ export function Profile() {
             </p>
           </div>
         </Card>
+
+        {/* Uitloggen */}
+        <Button
+          variant="ghost"
+          fullWidth
+          onClick={() => useAuthStore.getState().logout()}
+          className="flex items-center justify-center gap-2 text-ios-destructive"
+        >
+          <LogOut size={18} />
+          Uitloggen
+        </Button>
       </div>
     </PageLayout>
   );

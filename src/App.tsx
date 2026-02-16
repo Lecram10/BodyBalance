@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useUserStore } from './store/user-store';
+import { useAuthStore } from './store/auth-store';
 import { BottomNav } from './components/layout/BottomNav';
+import { Login } from './pages/Login';
 import { Onboarding } from './pages/Onboarding';
 import { Dashboard } from './pages/Dashboard';
 import { Search } from './pages/Search';
@@ -13,12 +15,30 @@ import { WifiOff, RefreshCw } from 'lucide-react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 function AppContent() {
+  const { user, isAuthLoading } = useAuthStore();
   const { profile, isLoading, loadProfile } = useUserStore();
 
   useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
+    if (user) {
+      loadProfile();
+    }
+  }, [user, loadProfile]);
 
+  // Wacht op auth state
+  if (isAuthLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  // Niet ingelogd → login scherm
+  if (!user) {
+    return <Login />;
+  }
+
+  // Profiel laden
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -27,6 +47,7 @@ function AppContent() {
     );
   }
 
+  // Geen profiel → onboarding
   if (!profile?.onboardingComplete) {
     return <Onboarding />;
   }

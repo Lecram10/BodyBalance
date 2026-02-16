@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useUserStore } from './store/user-store';
 import { useAuthStore } from './store/auth-store';
 import { pullAll, pushAll } from './lib/firestore-sync';
@@ -148,7 +148,7 @@ const WATER_HOURS = [8, 10, 12, 14, 16, 18, 20, 22];
 
 function sendNotification(title: string, body: string) {
   if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification(title, { body, icon: './icons/icon-192.png' });
+    new Notification(title, { body, icon: '/icons/icon-192x192.png' });
   }
 }
 
@@ -228,11 +228,11 @@ function App() {
   useNotificationScheduler();
 
   return (
-    <HashRouter>
+    <BrowserRouter>
       <OfflineBanner />
       <UpdatePrompt />
       <AppContent />
-    </HashRouter>
+    </BrowserRouter>
   );
 }
 

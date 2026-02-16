@@ -94,6 +94,8 @@ export function Scan() {
       const scanner = new Html5Qrcode('scanner-region');
       scannerRef.current = scanner;
       setCameraState('scanning');
+      // Wacht tot React de DOM heeft bijgewerkt (div zichtbaar)
+      await new Promise((r) => requestAnimationFrame(r));
       await scanner.start(
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0 },
@@ -245,8 +247,8 @@ export function Scan() {
             <Card className="w-full overflow-hidden">
               <div
                 id="scanner-region"
-                className="w-full bg-black"
-                style={{ minHeight: cameraState === 'scanning' ? 300 : 0, display: cameraState === 'scanning' ? 'block' : 'none' }}
+                className="w-full bg-black overflow-hidden"
+                style={{ minHeight: cameraState === 'scanning' ? 300 : 0, transition: 'min-height 0.2s ease' }}
               />
               {cameraState === 'idle' && !foundFood && (
                 <div className="flex flex-col items-center py-12 px-4">

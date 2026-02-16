@@ -10,7 +10,7 @@ import { EditEntryModal } from '../components/food/EditEntryModal';
 import { Card } from '../components/ui/Card';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Droplets, GlassWater, Coffee, RotateCcw, Copy, Bookmark, X, Flame, Trophy, TrendingDown, TrendingUp, Minus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Droplets, GlassWater, Coffee, RotateCcw, Copy, Bookmark, X, Flame, Trophy, TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import type { FoodItem, MealEntry, MealType } from '../types/food';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -62,7 +62,18 @@ export function Dashboard() {
   const [templates, setTemplates] = useState<MealTemplate[]>(getTemplates);
   const [streak, setStreak] = useState(0);
   const [weekReport, setWeekReport] = useState<WeekSummary | null>(null);
-  const [showWeekReport, setShowWeekReport] = useState(false);
+  const [weekReportExpanded, setWeekReportExpanded] = useState(() => {
+    // Op maandag bij eerste opening: uitgevouwen. Anders: ingeklapt.
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    if (dayOfWeek !== 1) return false; // Niet maandag → ingeklapt
+    // dayOfWeek === 1 (maandag), dus vandaag IS maandag
+    const mondayStr = now.toISOString().split('T')[0];
+    const seenKey = `bb_weekreport_seen_${mondayStr}`;
+    if (localStorage.getItem(seenKey)) return false; // Al gezien → ingeklapt
+    localStorage.setItem(seenKey, '1');
+    return true; // Maandag, eerste keer → uitgevouwen
+  });
   const [editingEntry, setEditingEntry] = useState<MealEntry | null>(null);
 
   const loadWater = useCallback(async () => {
@@ -93,30 +104,15 @@ export function Dashboard() {
     }
   }, [profile, entries]);
 
-  // Weekrapport: toon op maandag (of eerste keer na zondag)
+  // Weekrapport: lopend overzicht huidige week (ma-zo)
   useEffect(() => {
     if (!profile) return;
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    // Bereken vorige week maandag voor de dismissed key
-    const daysBack = dayOfWeek === 0 ? 7 : dayOfWeek + 6;
-    const prevMonday = new Date(now);
-    prevMonday.setDate(now.getDate() - daysBack);
-    const weekKey = `bb_weekreport_${prevMonday.toISOString().split('T')[0]}`;
-
-    if (!localStorage.getItem(weekKey)) {
-      getWeekSummary(
-        profile.dailyPointsBudget,
-        profile.weeklyPointsBudget,
-        profile.waterGoalMl || 2000
-      ).then((summary) => {
-        if (summary && summary.totalDays >= 3) {
-          setWeekReport(summary);
-          setShowWeekReport(true);
-        }
-      });
-    }
-  }, [profile]);
+    getWeekSummary(
+      profile.dailyPointsBudget,
+      profile.weeklyPointsBudget,
+      profile.waterGoalMl || 2000
+    ).then(setWeekReport);
+  }, [profile, entries]);
 
   const handleAddWater = async (ml: number) => {
     const newTotal = await addWaterIntake(selectedDate, ml);
@@ -168,14 +164,8 @@ export function Dashboard() {
     setTemplates(getTemplates());
   };
 
-  const handleDismissWeekReport = () => {
-    setShowWeekReport(false);
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const daysBack = dayOfWeek === 0 ? 7 : dayOfWeek + 6;
-    const prevMonday = new Date(now);
-    prevMonday.setDate(now.getDate() - daysBack);
-    localStorage.setItem(`bb_weekreport_${prevMonday.toISOString().split('T')[0]}`, '1');
+  const toggleWeekReport = () => {
+    setWeekReportExpanded((prev) => !prev);
   };
 
   const handleDismissStreakMilestone = (milestone: number) => {
@@ -233,22 +223,22 @@ export function Dashboard() {
         </div>
 
         {/* Week Report */}
-        {showWeekReport && weekReport && (
+        {weekReport && (
           <Card>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Trophy size={18} className="text-ios-blue" />
-                  <span className="text-[15px] font-semibold">{weekReport.weekLabel}</span>
-                </div>
-                <button
-                  onClick={handleDismissWeekReport}
-                  className="w-7 h-7 rounded-full bg-transparent border-none cursor-pointer flex items-center justify-center active:bg-gray-100"
-                >
-                  <X size={16} className="text-ios-secondary" />
-                </button>
+            <button
+              onClick={toggleWeekReport}
+              className="w-full p-4 flex items-center justify-between bg-transparent border-none cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <Trophy size={18} className="text-ios-blue" />
+                <span className="text-[15px] font-semibold">{weekReport.weekLabel}</span>
               </div>
-              <div className="flex flex-col gap-2">
+              {weekReportExpanded
+                ? <ChevronUp size={18} className="text-ios-secondary" />
+                : <ChevronDown size={18} className="text-ios-secondary" />}
+            </button>
+            {weekReportExpanded && (
+              <div className="px-4 pb-4 flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[14px] text-ios-secondary">Punten</span>
                   <span className="text-[14px] font-medium">
@@ -296,7 +286,7 @@ export function Dashboard() {
                   <span className="text-[14px] font-medium">{weekReport.weeklyPointsUsed} van {weekReport.weeklyPointsBudget} gebruikt</span>
                 </div>
               </div>
-            </div>
+            )}
           </Card>
         )}
 

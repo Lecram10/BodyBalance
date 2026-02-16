@@ -116,20 +116,20 @@ export async function searchUserFoods(query: string): Promise<FoodItem[]> {
  * Zoekt eerst in lokale NL database, dan via API met country filter.
  * Ondersteunt AbortSignal om verouderde requests te annuleren.
  */
-export async function searchFood(query: string, signal?: AbortSignal): Promise<FoodItem[]> {
+export async function searchFood(query: string, signal?: AbortSignal, existingLocal?: FoodItem[]): Promise<FoodItem[]> {
   if (!query || query.length < 2) return [];
 
-  // Stap 1: zoek in lokale NL voedingsmiddelen
-  const localResults = searchLocalFoods(query);
+  // Stap 1: lokale resultaten (hergebruik als al meegegeven)
+  const localResults = existingLocal ?? searchLocalFoods(query);
 
-  // Stap 2: zoek via Open Food Facts API (NL domein + country filter)
+  // Stap 2: zoek via Open Food Facts NL API
   try {
     const params = new URLSearchParams({
       search_terms: query,
       search_simple: '1',
       action: 'process',
       json: '1',
-      page_size: '20',
+      page_size: '15',
       fields: 'product_name,product_name_nl,brands,code,nutriments,serving_quantity,serving_size,quantity,image_front_small_url',
       lc: 'nl',
       tagtype_0: 'countries',
@@ -137,22 +137,7 @@ export async function searchFood(query: string, signal?: AbortSignal): Promise<F
       tag_0: 'Netherlands',
     });
 
-    // Start NL en World zoekopdrachten parallel
-    const nlFetch = fetch(`${OFF_API_BASE}/cgi/search.pl?${params}`, { signal });
-
-    const fallbackParams = new URLSearchParams({
-      search_terms: query,
-      search_simple: '1',
-      action: 'process',
-      json: '1',
-      page_size: '10',
-      fields: 'product_name,product_name_nl,brands,code,nutriments,serving_quantity,serving_size,quantity,image_front_small_url',
-      lc: 'nl',
-    });
-    const worldFetch = fetch(`https://world.openfoodfacts.org/cgi/search.pl?${fallbackParams}`, { signal });
-
-    // Wacht op NL resultaten
-    const response = await nlFetch;
+    const response = await fetch(`${OFF_API_BASE}/cgi/search.pl?${params}`, { signal });
     if (!response.ok) return localResults;
 
     const data = await response.json();
@@ -162,10 +147,19 @@ export async function searchFood(query: string, signal?: AbortSignal): Promise<F
       .map(mapToFoodItem)
       .filter((item): item is FoodItem => item !== null);
 
-    // Stap 3: als weinig NL resultaten, gebruik de al gestarte world fallback
+    // Stap 3: alleen World fallback als NL weinig resultaten heeft
     if (apiResults.length < 3) {
       try {
-        const fallbackResponse = await worldFetch;
+        const fallbackParams = new URLSearchParams({
+          search_terms: query,
+          search_simple: '1',
+          action: 'process',
+          json: '1',
+          page_size: '10',
+          fields: 'product_name,product_name_nl,brands,code,nutriments,serving_quantity,serving_size,quantity,image_front_small_url',
+          lc: 'nl',
+        });
+        const fallbackResponse = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?${fallbackParams}`, { signal });
 
         if (fallbackResponse.ok) {
           const fallbackData = await fallbackResponse.json();
@@ -174,7 +168,6 @@ export async function searchFood(query: string, signal?: AbortSignal): Promise<F
             .map(mapToFoodItem)
             .filter((item): item is FoodItem => item !== null);
 
-          // Voeg toe zonder duplicaten (op basis van barcode of naam)
           const existingNames = new Set(apiResults.map((r) => r.name.toLowerCase()));
           for (const item of fallbackItems) {
             if (!existingNames.has(item.name.toLowerCase())) {

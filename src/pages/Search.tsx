@@ -88,10 +88,10 @@ export function Search() {
       setHasSearched(true);
     }
 
-    // Stap 2: API resultaten ophalen (kan traag zijn)
+    // Stap 2: API resultaten ophalen (hergebruik lokale resultaten)
     setIsSearching(true);
     try {
-      const items = await searchFood(q, controller.signal);
+      const items = await searchFood(q, controller.signal, combined);
       if (!controller.signal.aborted) {
         setSearchResults(markFavs(items));
         setIsSearching(false);

@@ -71,8 +71,8 @@ export function MealSection({ mealType, entries, totalPoints, onRemoveEntry, onE
                 </span>
                 {entry.id != null && (
                   <button
-                    onClick={() => onRemoveEntry(entry.id!)}
-                    className="text-ios-secondary active:text-ios-destructive border-none bg-transparent cursor-pointer p-1"
+                    onClick={(e) => { e.stopPropagation(); onRemoveEntry(entry.id!); }}
+                    className="text-ios-secondary active:text-ios-destructive border-none bg-transparent cursor-pointer p-2"
                   >
                     <Trash2 size={16} />
                   </button>

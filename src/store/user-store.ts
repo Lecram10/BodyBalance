@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type { UserProfile } from '../types/user';
 import { db } from '../db/database';
+import { auth } from '../lib/firebase';
+import { pushProfile } from '../lib/firestore-sync';
 
 interface UserState {
   profile: UserProfile | null;
@@ -30,9 +32,11 @@ export const useUserStore = create<UserState>((set, get) => ({
         ...profileData,
         updatedAt: now,
       });
-      set({
-        profile: { ...existing, ...profileData, updatedAt: now },
-      });
+      const updated = { ...existing, ...profileData, updatedAt: now };
+      set({ profile: updated });
+      // Sync naar Firestore
+      const uid = auth.currentUser?.uid;
+      if (uid) pushProfile(uid, updated).catch(() => {});
     } else {
       const id = await db.userProfiles.add({
         ...profileData,
@@ -41,6 +45,9 @@ export const useUserStore = create<UserState>((set, get) => ({
       });
       const profile = await db.userProfiles.get(id);
       set({ profile: profile || null });
+      // Sync naar Firestore
+      const uid = auth.currentUser?.uid;
+      if (uid && profile) pushProfile(uid, profile).catch(() => {});
     }
   },
 

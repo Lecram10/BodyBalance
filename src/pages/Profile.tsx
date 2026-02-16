@@ -14,7 +14,10 @@ import type { Gender, ActivityLevel, Goal } from '../types/user';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor } from 'lucide-react';
+import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor, LogOut } from 'lucide-react';
+import { useAuthStore } from '../store/auth-store';
+import { pushWeight, pushAll } from '../lib/firestore-sync';
+import { auth } from '../lib/firebase';
 
 export function Profile() {
   const navigate = useNavigate();
@@ -91,6 +94,10 @@ export function Profile() {
     await updateWeight(weight);
     setNewWeight('');
     loadWeightEntries();
+
+    // Sync naar Firestore
+    const uid = useAuthStore.getState().user?.uid;
+    if (uid) pushWeight(uid, { date: today, weightKg: weight }).catch(() => {});
   };
 
   const loadAISettings = async () => {
@@ -230,8 +237,14 @@ export function Profile() {
           if (data.weightEntries?.length) await db.weightEntries.bulkAdd(data.weightEntries);
         });
 
+        // Push geïmporteerde data naar Firestore (achtergrond)
+        const uid = auth.currentUser?.uid;
+        if (uid) {
+          pushAll(uid).catch(() => {});
+        }
+
         setImportStatus('Import gelukt! Pagina herlaadt...');
-        setTimeout(() => window.location.reload(), 1500);
+        setTimeout(() => window.location.reload(), 500);
       } catch {
         setImportStatus('Import mislukt - ongeldig bestand');
         setTimeout(() => setImportStatus(null), 3000);
@@ -662,6 +675,17 @@ export function Profile() {
             </p>
           </div>
         </Card>
+
+        {/* Uitloggen */}
+        <Button
+          variant="ghost"
+          fullWidth
+          onClick={() => useAuthStore.getState().logout()}
+          className="flex items-center justify-center gap-2 text-ios-destructive"
+        >
+          <LogOut size={18} />
+          Uitloggen
+        </Button>
       </div>
     </PageLayout>
   );

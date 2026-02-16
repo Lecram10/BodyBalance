@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useUserStore } from './store/user-store';
+import { useAuthStore } from './store/auth-store';
+import { pullAll, pushAll } from './lib/firestore-sync';
 import { BottomNav } from './components/layout/BottomNav';
+import { Login } from './pages/Login';
 import { Onboarding } from './pages/Onboarding';
 import { Dashboard } from './pages/Dashboard';
 import { Search } from './pages/Search';
@@ -13,12 +16,59 @@ import { WifiOff, RefreshCw } from 'lucide-react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 function AppContent() {
+  const { user, isAuthLoading } = useAuthStore();
   const { profile, isLoading, loadProfile } = useUserStore();
+  const syncDone = useRef(false);
 
   useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
+    if (!user) {
+      syncDone.current = false;
+      return;
+    }
 
+    // Bij login: profiel direct laden, sync op achtergrond
+    const doSync = async () => {
+      // Laad profiel eerst → UI toont meteen
+      await loadProfile();
+
+      if (!syncDone.current) {
+        syncDone.current = true;
+        // Sync op achtergrond (niet blokkerend)
+        try {
+          const hasRemoteData = await pullAll(user.uid);
+          if (hasRemoteData) {
+            // Remote data gemerged → profiel opnieuw laden
+            await loadProfile();
+          } else {
+            // Geen remote data → push lokale data naar Firestore
+            pushAll(user.uid).catch((err) =>
+              console.warn('[Sync] Push all failed:', err)
+            );
+          }
+        } catch (err) {
+          console.warn('[Sync] Initial sync failed:', err);
+        }
+      }
+    };
+
+    doSync();
+  }, [user, loadProfile]);
+
+  // Wacht op auth state
+  if (isAuthLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  // Niet ingelogd → login scherm
+  if (!user) {
+    return <Login />;
+  }
+
+  // Profiel laden
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -27,6 +77,7 @@ function AppContent() {
     );
   }
 
+  // Geen profiel → onboarding
   if (!profile?.onboardingComplete) {
     return <Onboarding />;
   }
@@ -105,7 +156,7 @@ const WATER_HOURS = [8, 10, 12, 14, 16, 18, 20, 22];
 
 function sendNotification(title: string, body: string) {
   if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification(title, { body, icon: './icons/icon-192.png' });
+    new Notification(title, { body, icon: '/icons/icon-192x192.png' });
   }
 }
 
@@ -185,11 +236,11 @@ function App() {
   useNotificationScheduler();
 
   return (
-    <HashRouter>
+    <BrowserRouter>
       <OfflineBanner />
       <UpdatePrompt />
       <AppContent />
-    </HashRouter>
+    </BrowserRouter>
   );
 }
 

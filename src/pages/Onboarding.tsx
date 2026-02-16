@@ -6,7 +6,8 @@ import { Button } from '../components/ui/Button';
 import { InputField, SelectField } from '../components/ui/FormField';
 import { ACTIVITY_LABELS, GOAL_LABELS } from '../types/user';
 import type { Gender, ActivityLevel, Goal } from '../types/user';
-import { ChevronRight, Scale, Target, Sparkles } from 'lucide-react';
+import { ChevronRight, Scale, Target, Sparkles, LogOut } from 'lucide-react';
+import { useAuthStore } from '../store/auth-store';
 
 type Step = 'welcome' | 'profile' | 'result';
 
@@ -60,6 +61,13 @@ export function Onboarding() {
           Aan de slag
           <ChevronRight size={20} className="inline ml-1" />
         </Button>
+        <button
+          onClick={() => useAuthStore.getState().logout()}
+          className="mt-4 flex items-center justify-center gap-2 text-[15px] text-ios-secondary bg-transparent border-none cursor-pointer"
+        >
+          <LogOut size={16} />
+          Uitloggen
+        </button>
       </div>
     );
   }

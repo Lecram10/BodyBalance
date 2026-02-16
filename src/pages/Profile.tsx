@@ -16,7 +16,8 @@ import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor, LogOut } from 'lucide-react';
 import { useAuthStore } from '../store/auth-store';
-import { pushWeight } from '../lib/firestore-sync';
+import { pushWeight, pushAll } from '../lib/firestore-sync';
+import { auth } from '../lib/firebase';
 
 export function Profile() {
   const navigate = useNavigate();
@@ -235,6 +236,13 @@ export function Profile() {
           if (data.dailyLogs?.length) await db.dailyLogs.bulkAdd(data.dailyLogs);
           if (data.weightEntries?.length) await db.weightEntries.bulkAdd(data.weightEntries);
         });
+
+        // Push geïmporteerde data naar Firestore
+        const uid = auth.currentUser?.uid;
+        if (uid) {
+          setImportStatus('Import gelukt! Synchroniseren...');
+          await pushAll(uid);
+        }
 
         setImportStatus('Import gelukt! Pagina herlaadt...');
         setTimeout(() => window.location.reload(), 1500);

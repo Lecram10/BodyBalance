@@ -1,6 +1,24 @@
 import Dexie, { type Table } from 'dexie';
 import type { FoodItem, MealEntry } from '../types/food';
 import type { UserProfile, WeightEntry, DailyLog } from '../types/user';
+import { auth } from '../lib/firebase';
+import { pushDay, pushFood } from '../lib/firestore-sync';
+
+/** Haal de huidige Firebase user ID op (null als niet ingelogd). */
+function getUid(): string | null {
+  return auth.currentUser?.uid ?? null;
+}
+
+/** Fire-and-forget sync naar Firestore. */
+function syncDay(date: string) {
+  const uid = getUid();
+  if (uid) pushDay(uid, date).catch(() => {});
+}
+
+function syncFood(food: FoodItem) {
+  const uid = getUid();
+  if (uid) pushFood(uid, food).catch(() => {});
+}
 
 export class BodyBalanceDB extends Dexie {
   userProfiles!: Table<UserProfile, number>;
@@ -73,6 +91,8 @@ export async function addMealEntry(
   await db.dailyLogs.update(log.id!, {
     totalPointsUsed: totalPoints,
   });
+
+  syncDay(date);
 }
 
 // Helper: update een bestaande maaltijdentry (aantal, hoeveelheid, punten)
@@ -93,6 +113,10 @@ export async function updateMealEntry(
       .toArray();
     const totalPoints = entries.reduce((sum, e) => sum + (e.id === entryId ? updates.points : e.points), 0);
     await db.dailyLogs.update(entry.dailyLogId, { totalPointsUsed: totalPoints });
+
+    // Sync de dag waar deze entry bij hoort
+    const log = await db.dailyLogs.get(entry.dailyLogId);
+    if (log) syncDay(log.date);
   }
 }
 
@@ -113,6 +137,10 @@ export async function removeMealEntry(entryId: number): Promise<void> {
     await db.dailyLogs.update(entry.dailyLogId, {
       totalPointsUsed: totalPoints,
     });
+
+    // Sync de dag waar deze entry bij hoorde
+    const log = await db.dailyLogs.get(entry.dailyLogId);
+    if (log) syncDay(log.date);
   }
 }
 
@@ -189,7 +217,9 @@ export async function saveCustomFood(food: Omit<FoodItem, 'id' | 'createdAt'>): 
     ...food,
     createdAt: new Date(),
   });
-  return (await db.foodItems.get(id))!;
+  const saved = (await db.foodItems.get(id))!;
+  syncFood(saved);
+  return saved;
 }
 
 // Helper: haal alle eigen producten op
@@ -252,6 +282,7 @@ export async function addWaterIntake(date: string, ml: number): Promise<number> 
   const log = await getOrCreateDailyLog(date);
   const newTotal = (log.waterMl ?? 0) + ml;
   await db.dailyLogs.update(log.id!, { waterMl: newTotal });
+  syncDay(date);
   return newTotal;
 }
 
@@ -262,6 +293,7 @@ export async function resetWaterIntake(date: string): Promise<void> {
   const log = await db.dailyLogs.where('date').equals(date).first();
   if (log?.id) {
     await db.dailyLogs.update(log.id, { waterMl: 0 });
+    syncDay(date);
   }
 }
 

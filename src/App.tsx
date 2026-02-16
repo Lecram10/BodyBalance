@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useUserStore } from './store/user-store';
 import { useAuthStore } from './store/auth-store';
+import { pullAll, pushAll } from './lib/firestore-sync';
 import { BottomNav } from './components/layout/BottomNav';
 import { Login } from './pages/Login';
 import { Onboarding } from './pages/Onboarding';
@@ -17,11 +18,32 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 function AppContent() {
   const { user, isAuthLoading } = useAuthStore();
   const { profile, isLoading, loadProfile } = useUserStore();
+  const syncDone = useRef(false);
 
   useEffect(() => {
-    if (user) {
-      loadProfile();
+    if (!user) {
+      syncDone.current = false;
+      return;
     }
+
+    // Bij login: eerst pull van Firestore, dan lokaal profiel laden
+    const doSync = async () => {
+      if (!syncDone.current) {
+        syncDone.current = true;
+        try {
+          const hasRemoteData = await pullAll(user.uid);
+          if (!hasRemoteData) {
+            // Geen remote data → push lokale data naar Firestore
+            await pushAll(user.uid);
+          }
+        } catch (err) {
+          console.warn('[Sync] Initial sync failed:', err);
+        }
+      }
+      loadProfile();
+    };
+
+    doSync();
   }, [user, loadProfile]);
 
   // Wacht op auth state

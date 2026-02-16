@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor, LogOut } from 'lucide-react';
 import { useAuthStore } from '../store/auth-store';
+import { pushWeight } from '../lib/firestore-sync';
 
 export function Profile() {
   const navigate = useNavigate();
@@ -92,6 +93,10 @@ export function Profile() {
     await updateWeight(weight);
     setNewWeight('');
     loadWeightEntries();
+
+    // Sync naar Firestore
+    const uid = useAuthStore.getState().user?.uid;
+    if (uid) pushWeight(uid, { date: today, weightKg: weight }).catch(() => {});
   };
 
   const loadAISettings = async () => {

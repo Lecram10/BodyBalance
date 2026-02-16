@@ -237,15 +237,14 @@ export function Profile() {
           if (data.weightEntries?.length) await db.weightEntries.bulkAdd(data.weightEntries);
         });
 
-        // Push geïmporteerde data naar Firestore
+        // Push geïmporteerde data naar Firestore (achtergrond)
         const uid = auth.currentUser?.uid;
         if (uid) {
-          setImportStatus('Import gelukt! Synchroniseren...');
-          await pushAll(uid);
+          pushAll(uid).catch(() => {});
         }
 
         setImportStatus('Import gelukt! Pagina herlaadt...');
-        setTimeout(() => window.location.reload(), 1500);
+        setTimeout(() => window.location.reload(), 500);
       } catch {
         setImportStatus('Import mislukt - ongeldig bestand');
         setTimeout(() => setImportStatus(null), 3000);

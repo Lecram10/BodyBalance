@@ -333,23 +333,22 @@ export async function pushAll(userId: string): Promise<void> {
       await pushProfile(userId, profiles[0]);
     }
 
-    // Alle dagen
+    // Dagen, gewicht en producten parallel pushen (batches van 5)
     const logs = await db.dailyLogs.toArray();
-    for (const log of logs) {
-      await pushDay(userId, log.date);
-    }
-
-    // Gewicht
     const weights = await db.weightEntries.toArray();
-    for (const w of weights) {
-      await pushWeight(userId, w);
-    }
-
-    // Eigen producten
     const foods = await db.foodItems.where('source').equals('user').toArray();
-    for (const f of foods) {
-      await pushFood(userId, f);
-    }
+
+    const batch = async <T>(items: T[], fn: (item: T) => Promise<void>) => {
+      for (let i = 0; i < items.length; i += 5) {
+        await Promise.all(items.slice(i, i + 5).map(fn));
+      }
+    };
+
+    await Promise.all([
+      batch(logs, (log) => pushDay(userId, log.date)),
+      batch(weights, (w) => pushWeight(userId, w)),
+      batch(foods, (f) => pushFood(userId, f)),
+    ]);
 
     console.log('[Sync] Push all complete.');
   } catch (err) {

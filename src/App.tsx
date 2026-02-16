@@ -26,21 +26,29 @@ function AppContent() {
       return;
     }
 
-    // Bij login: eerst pull van Firestore, dan lokaal profiel laden
+    // Bij login: profiel direct laden, sync op achtergrond
     const doSync = async () => {
+      // Laad profiel eerst → UI toont meteen
+      await loadProfile();
+
       if (!syncDone.current) {
         syncDone.current = true;
+        // Sync op achtergrond (niet blokkerend)
         try {
           const hasRemoteData = await pullAll(user.uid);
-          if (!hasRemoteData) {
+          if (hasRemoteData) {
+            // Remote data gemerged → profiel opnieuw laden
+            await loadProfile();
+          } else {
             // Geen remote data → push lokale data naar Firestore
-            await pushAll(user.uid);
+            pushAll(user.uid).catch((err) =>
+              console.warn('[Sync] Push all failed:', err)
+            );
           }
         } catch (err) {
           console.warn('[Sync] Initial sync failed:', err);
         }
       }
-      loadProfile();
     };
 
     doSync();

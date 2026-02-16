@@ -46,9 +46,10 @@ function fromFirestoreDate(s: string | null): Date {
 export async function pushProfile(userId: string, profile: UserProfile): Promise<void> {
   try {
     const ref = doc(firestore, 'users', userId, 'profile', 'data');
+    // Strip gevoelige velden (API keys blijven alleen lokaal)
+    const { id, anthropicApiKey, anthropicApiUrl, ...safeProfile } = profile as any;
     await setDoc(ref, {
-      ...profile,
-      id: undefined,
+      ...safeProfile,
       createdAt: toFirestoreDate(profile.createdAt),
       updatedAt: toFirestoreDate(profile.updatedAt || new Date()),
     });

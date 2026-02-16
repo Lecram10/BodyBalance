@@ -287,10 +287,10 @@ export async function copyDayEntries(fromDate: string, toDate: string): Promise<
 }
 
 /**
- * Weekrapport: samenvatting van de vorige week (ma-zo).
+ * Weekrapport: lopende samenvatting van de huidige week (ma-zo).
  */
 export interface WeekSummary {
-  weekLabel: string;           // bijv. "Week 6 · 3-9 feb"
+  weekLabel: string;           // bijv. "Week 7 · 10-16 feb"
   avgPoints: number;           // gemiddelde punten per dag
   dailyBudget: number;
   daysWithinBudget: number;    // dagen onder dagbudget
@@ -309,12 +309,17 @@ export async function getWeekSummary(
   weeklyBudget: number,
   waterGoalMl: number
 ): Promise<WeekSummary | null> {
-  // Vorige week: ma-zo
+  // Huidige week: ma t/m zo
   const now = new Date();
   const dayOfWeek = now.getDay(); // 0=zo, 1=ma
-  const daysBack = dayOfWeek === 0 ? 7 : dayOfWeek + 6; // terug naar vorige maandag
-  const prevMonday = new Date(now);
-  prevMonday.setDate(now.getDate() - daysBack);
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + mondayOffset);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const todayStr = now.toISOString().split('T')[0];
 
   let totalPoints = 0;
   let totalDays = 0;
@@ -328,9 +333,13 @@ export async function getWeekSummary(
   const dayNames = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
 
   for (let i = 0; i < 7; i++) {
-    const d = new Date(prevMonday);
-    d.setDate(prevMonday.getDate() + i);
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
     const dateStr = d.toISOString().split('T')[0];
+
+    // Stop als we voorbij vandaag zijn
+    if (dateStr > todayStr) break;
+
     const log = await db.dailyLogs.where('date').equals(dateStr).first();
 
     if (log) {
@@ -351,21 +360,18 @@ export async function getWeekSummary(
   if (totalDays === 0) return null;
 
   // Gewichtsverandering
-  const mondayStr = prevMonday.toISOString().split('T')[0];
-  const sunday = new Date(prevMonday);
-  sunday.setDate(prevMonday.getDate() + 6);
-  const sundayStr = sunday.toISOString().split('T')[0];
+  const mondayStr = monday.toISOString().split('T')[0];
 
-  const weightStart = await db.weightEntries.where('date').aboveOrEqual(mondayStr).and(w => w.date <= sundayStr).first();
-  const weightEnd = await db.weightEntries.where('date').belowOrEqual(sundayStr).and(w => w.date >= mondayStr).reverse().first();
+  const weightStart = await db.weightEntries.where('date').aboveOrEqual(mondayStr).and(w => w.date <= todayStr).first();
+  const weightEnd = await db.weightEntries.where('date').belowOrEqual(todayStr).and(w => w.date >= mondayStr).reverse().first();
   const weightChange = weightStart && weightEnd && weightStart.date !== weightEnd.date
     ? weightEnd.weightKg - weightStart.weightKg
     : null;
 
   // Week label
   const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
-  const weekNum = getISOWeekNumber(prevMonday);
-  const weekLabel = `Week ${weekNum} · ${prevMonday.getDate()}-${sunday.getDate()} ${months[sunday.getMonth()]}`;
+  const weekNum = getISOWeekNumber(monday);
+  const weekLabel = `Week ${weekNum} · ${monday.getDate()}-${sunday.getDate()} ${months[sunday.getMonth()]}`;
 
   return {
     weekLabel,

@@ -8,6 +8,7 @@ import { format, startOfWeek, addDays, subWeeks } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import type { MealEntry } from '../types/food';
 import type { WeightEntry } from '../types/user';
+import { Scale, Target, TrendingDown } from 'lucide-react';
 
 export function Statistics() {
   const profile = useUserStore((s) => s.profile);
@@ -101,6 +102,27 @@ export function Statistics() {
   return (
     <PageLayout title="Statistieken">
       <div className="flex flex-col gap-4 pb-4">
+        {/* Gewicht stats */}
+        {profile && (
+          <div className="grid grid-cols-3 gap-3">
+            <Card className="p-3 text-center">
+              <Scale size={20} className="text-primary mx-auto mb-1" />
+              <div className="text-[20px] font-bold">{profile.currentWeightKg}</div>
+              <div className="text-[11px] text-ios-secondary">kg nu</div>
+            </Card>
+            <Card className="p-3 text-center">
+              <Target size={20} className="text-ios-blue mx-auto mb-1" />
+              <div className="text-[20px] font-bold">{profile.goalWeightKg}</div>
+              <div className="text-[11px] text-ios-secondary">kg doel</div>
+            </Card>
+            <Card className="p-3 text-center">
+              <TrendingDown size={20} className="text-ios-warning mx-auto mb-1" />
+              <div className="text-[20px] font-bold">{profile.currentWeightKg - profile.goalWeightKg > 0 ? (profile.currentWeightKg - profile.goalWeightKg).toFixed(1) : '0'}</div>
+              <div className="text-[11px] text-ios-secondary">kg te gaan</div>
+            </Card>
+          </div>
+        )}
+
         {/* Week navigator */}
         <div className="flex items-center justify-between">
           <button

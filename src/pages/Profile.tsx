@@ -11,7 +11,7 @@ import { getAISettings, saveAISettings } from '../lib/ai-service';
 import { ACTIVITY_LABELS, GOAL_LABELS } from '../types/user';
 import type { Gender, ActivityLevel, Goal } from '../types/user';
 import { format } from 'date-fns';
-import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor, LogOut, Shield } from 'lucide-react';
+import { Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor, LogOut, Shield } from 'lucide-react';
 import { useAuthStore } from '../store/auth-store';
 import { pushWeight, pushAll } from '../lib/firestore-sync';
 import { auth } from '../lib/firebase';
@@ -274,30 +274,9 @@ export function Profile() {
 
   if (!profile) return null;
 
-  const weightDiff = profile.currentWeightKg - profile.goalWeightKg;
-
   return (
     <PageLayout title="Profiel">
       <div className="flex flex-col gap-4 pb-4">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <Card className="p-3 text-center">
-            <Scale size={20} className="text-primary mx-auto mb-1" />
-            <div className="text-[20px] font-bold">{profile.currentWeightKg}</div>
-            <div className="text-[11px] text-ios-secondary">kg nu</div>
-          </Card>
-          <Card className="p-3 text-center">
-            <Target size={20} className="text-ios-blue mx-auto mb-1" />
-            <div className="text-[20px] font-bold">{profile.goalWeightKg}</div>
-            <div className="text-[11px] text-ios-secondary">kg doel</div>
-          </Card>
-          <Card className="p-3 text-center">
-            <TrendingDown size={20} className="text-ios-warning mx-auto mb-1" />
-            <div className="text-[20px] font-bold">{weightDiff > 0 ? weightDiff.toFixed(1) : '0'}</div>
-            <div className="text-[11px] text-ios-secondary">kg te gaan</div>
-          </Card>
-        </div>
-
         {/* Weight logger */}
         <Card>
           <CardHeader title="Gewicht loggen" />

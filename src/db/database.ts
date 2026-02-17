@@ -339,19 +339,23 @@ export interface WeekSummary {
 export async function getWeekSummary(
   dailyBudget: number,
   weeklyBudget: number,
-  waterGoalMl: number
+  waterGoalMl: number,
+  weekOffset: number = 0
 ): Promise<WeekSummary | null> {
-  // Huidige week: ma t/m zo
+  // Week berekenen op basis van offset (0 = huidige week, 1 = vorige week, etc.)
   const now = new Date();
   const dayOfWeek = now.getDay(); // 0=zo, 1=ma
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   const monday = new Date(now);
-  monday.setDate(now.getDate() + mondayOffset);
+  monday.setDate(now.getDate() + mondayOffset - (weekOffset * 7));
 
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
 
   const todayStr = now.toISOString().split('T')[0];
+  const sundayStr = sunday.toISOString().split('T')[0];
+  // Voor vorige weken: alle 7 dagen tonen. Voor huidige week: t/m vandaag.
+  const endStr = sundayStr < todayStr ? sundayStr : todayStr;
 
   let totalPoints = 0;
   let totalDays = 0;
@@ -369,8 +373,8 @@ export async function getWeekSummary(
     d.setDate(monday.getDate() + i);
     const dateStr = d.toISOString().split('T')[0];
 
-    // Stop als we voorbij vandaag zijn
-    if (dateStr > todayStr) break;
+    // Stop als we voorbij het einde van de week/vandaag zijn
+    if (dateStr > endStr) break;
 
     const log = await db.dailyLogs.where('date').equals(dateStr).first();
 
@@ -394,8 +398,8 @@ export async function getWeekSummary(
   // Gewichtsverandering
   const mondayStr = monday.toISOString().split('T')[0];
 
-  const weightStart = await db.weightEntries.where('date').aboveOrEqual(mondayStr).and(w => w.date <= todayStr).first();
-  const weightEnd = await db.weightEntries.where('date').belowOrEqual(todayStr).and(w => w.date >= mondayStr).reverse().first();
+  const weightStart = await db.weightEntries.where('date').aboveOrEqual(mondayStr).and(w => w.date <= endStr).first();
+  const weightEnd = await db.weightEntries.where('date').belowOrEqual(endStr).and(w => w.date >= mondayStr).reverse().first();
   const weightChange = weightStart && weightEnd && weightStart.date !== weightEnd.date
     ? weightEnd.weightKg - weightStart.weightKg
     : null;

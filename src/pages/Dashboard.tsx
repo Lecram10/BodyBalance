@@ -62,18 +62,8 @@ export function Dashboard() {
   const [templates, setTemplates] = useState<MealTemplate[]>(getTemplates);
   const [streak, setStreak] = useState(0);
   const [weekReport, setWeekReport] = useState<WeekSummary | null>(null);
-  const [weekReportExpanded, setWeekReportExpanded] = useState(() => {
-    // Op maandag bij eerste opening: uitgevouwen. Anders: ingeklapt.
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    if (dayOfWeek !== 1) return false; // Niet maandag → ingeklapt
-    // dayOfWeek === 1 (maandag), dus vandaag IS maandag
-    const mondayStr = now.toISOString().split('T')[0];
-    const seenKey = `bb_weekreport_seen_${mondayStr}`;
-    if (localStorage.getItem(seenKey)) return false; // Al gezien → ingeklapt
-    localStorage.setItem(seenKey, '1');
-    return true; // Maandag, eerste keer → uitgevouwen
-  });
+  const [weekReportOffset, setWeekReportOffset] = useState(0);
+  const [weekReportExpanded, setWeekReportExpanded] = useState(true);
   const [editingEntry, setEditingEntry] = useState<MealEntry | null>(null);
 
   const loadWater = useCallback(async () => {
@@ -104,15 +94,16 @@ export function Dashboard() {
     }
   }, [profile, entries]);
 
-  // Weekrapport: lopend overzicht huidige week (ma-zo)
+  // Weekrapport: dynamisch op basis van weekReportOffset
   useEffect(() => {
     if (!profile) return;
     getWeekSummary(
       profile.dailyPointsBudget,
       profile.weeklyPointsBudget,
-      profile.waterGoalMl || 2000
+      profile.waterGoalMl || 2000,
+      weekReportOffset
     ).then(setWeekReport);
-  }, [profile, entries]);
+  }, [profile, entries, weekReportOffset]);
 
   const handleAddWater = async (ml: number) => {
     const newTotal = await addWaterIntake(selectedDate, ml);
@@ -223,72 +214,90 @@ export function Dashboard() {
         </div>
 
         {/* Week Report */}
-        {weekReport && (
-          <Card>
+        <Card>
+          <div className="p-4 flex items-center justify-between">
+            <button
+              onClick={() => setWeekReportOffset((o) => o + 1)}
+              className="w-8 h-8 rounded-full bg-ios-bg flex items-center justify-center border-none cursor-pointer active:bg-gray-200"
+            >
+              <ChevronLeft size={18} className="text-ios-text" />
+            </button>
             <button
               onClick={toggleWeekReport}
-              className="w-full p-4 flex items-center justify-between bg-transparent border-none cursor-pointer"
+              className="flex items-center gap-2 bg-transparent border-none cursor-pointer px-2"
             >
-              <div className="flex items-center gap-2">
-                <Trophy size={18} className="text-ios-blue" />
-                <span className="text-[15px] font-semibold">{weekReport.weekLabel}</span>
-              </div>
+              <Trophy size={18} className="text-ios-blue" />
+              <span className="text-[15px] font-semibold">
+                {weekReport ? weekReport.weekLabel : 'Weekoverzicht'}
+              </span>
               {weekReportExpanded
-                ? <ChevronUp size={18} className="text-ios-secondary" />
-                : <ChevronDown size={18} className="text-ios-secondary" />}
+                ? <ChevronUp size={16} className="text-ios-secondary" />
+                : <ChevronDown size={16} className="text-ios-secondary" />}
             </button>
-            {weekReportExpanded && (
-              <div className="px-4 pb-4 flex flex-col gap-2">
+            <button
+              onClick={() => setWeekReportOffset((o) => Math.max(0, o - 1))}
+              disabled={weekReportOffset === 0}
+              className={`w-8 h-8 rounded-full bg-ios-bg flex items-center justify-center border-none cursor-pointer ${weekReportOffset === 0 ? 'opacity-30' : 'active:bg-gray-200'}`}
+            >
+              <ChevronRight size={18} className="text-ios-text" />
+            </button>
+          </div>
+          {weekReportExpanded && weekReport && (
+            <div className="px-4 pb-4 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[14px] text-ios-secondary">Punten</span>
+                <span className="text-[14px] font-medium">
+                  gem. {weekReport.avgPoints}/{weekReport.dailyBudget} pt
+                  {weekReport.avgPoints <= weekReport.dailyBudget
+                    ? <span className="text-primary ml-1">&#10003;</span>
+                    : <span className="text-ios-destructive ml-1">&#10007;</span>}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[14px] text-ios-secondary">Binnen budget</span>
+                <span className="text-[14px] font-medium">
+                  {weekReport.daysWithinBudget} van {weekReport.totalDays} dagen
+                  {weekReport.daysWithinBudget >= weekReport.totalDays - 1
+                    ? <span className="text-primary ml-1">&#10003;</span>
+                    : null}
+                </span>
+              </div>
+              {weekReport.waterTotalDays > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[14px] text-ios-secondary">Punten</span>
+                  <span className="text-[14px] text-ios-secondary">Water</span>
                   <span className="text-[14px] font-medium">
-                    gem. {weekReport.avgPoints}/{weekReport.dailyBudget} pt
-                    {weekReport.avgPoints <= weekReport.dailyBudget
-                      ? <span className="text-primary ml-1">&#10003;</span>
-                      : <span className="text-ios-destructive ml-1">&#10007;</span>}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[14px] text-ios-secondary">Binnen budget</span>
-                  <span className="text-[14px] font-medium">
-                    {weekReport.daysWithinBudget} van {weekReport.totalDays} dagen
-                    {weekReport.daysWithinBudget >= weekReport.totalDays - 1
-                      ? <span className="text-primary ml-1">&#10003;</span>
+                    {weekReport.waterDaysOnTarget} van {weekReport.waterTotalDays} dagen doel
+                    {weekReport.waterDaysOnTarget >= weekReport.waterTotalDays - 1
+                      ? <span className="text-blue-500 ml-1">&#10003;</span>
                       : null}
                   </span>
                 </div>
-                {weekReport.waterTotalDays > 0 && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-[14px] text-ios-secondary">Water</span>
-                    <span className="text-[14px] font-medium">
-                      {weekReport.waterDaysOnTarget} van {weekReport.waterTotalDays} dagen doel
-                      {weekReport.waterDaysOnTarget >= weekReport.waterTotalDays - 1
-                        ? <span className="text-blue-500 ml-1">&#10003;</span>
-                        : null}
-                    </span>
-                  </div>
-                )}
-                {weekReport.weightChange !== null && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-[14px] text-ios-secondary">Gewicht</span>
-                    <span className={`text-[14px] font-medium flex items-center gap-1 ${weekReport.weightChange < 0 ? 'text-primary' : weekReport.weightChange > 0 ? 'text-ios-warning' : ''}`}>
-                      {weekReport.weightChange < 0 ? <TrendingDown size={14} /> : weekReport.weightChange > 0 ? <TrendingUp size={14} /> : <Minus size={14} />}
-                      {weekReport.weightChange > 0 ? '+' : ''}{weekReport.weightChange.toFixed(1)} kg
-                    </span>
-                  </div>
-                )}
-                <div className="border-t border-ios-separator mt-1 pt-2 flex items-center justify-between">
-                  <span className="text-[14px] text-ios-secondary">Beste dag</span>
-                  <span className="text-[14px] font-medium">{weekReport.bestDay} ({weekReport.bestDayPoints} pt)</span>
-                </div>
+              )}
+              {weekReport.weightChange !== null && (
                 <div className="flex items-center justify-between">
-                  <span className="text-[14px] text-ios-secondary">Weekpunten</span>
-                  <span className="text-[14px] font-medium">{weekReport.weeklyPointsUsed} van {weekReport.weeklyPointsBudget} gebruikt</span>
+                  <span className="text-[14px] text-ios-secondary">Gewicht</span>
+                  <span className={`text-[14px] font-medium flex items-center gap-1 ${weekReport.weightChange < 0 ? 'text-primary' : weekReport.weightChange > 0 ? 'text-ios-warning' : ''}`}>
+                    {weekReport.weightChange < 0 ? <TrendingDown size={14} /> : weekReport.weightChange > 0 ? <TrendingUp size={14} /> : <Minus size={14} />}
+                    {weekReport.weightChange > 0 ? '+' : ''}{weekReport.weightChange.toFixed(1)} kg
+                  </span>
                 </div>
+              )}
+              <div className="border-t border-ios-separator mt-1 pt-2 flex items-center justify-between">
+                <span className="text-[14px] text-ios-secondary">Beste dag</span>
+                <span className="text-[14px] font-medium">{weekReport.bestDay} ({weekReport.bestDayPoints} pt)</span>
               </div>
-            )}
-          </Card>
-        )}
+              <div className="flex items-center justify-between">
+                <span className="text-[14px] text-ios-secondary">Weekpunten</span>
+                <span className="text-[14px] font-medium">{weekReport.weeklyPointsUsed} van {weekReport.weeklyPointsBudget} gebruikt</span>
+              </div>
+            </div>
+          )}
+          {weekReportExpanded && !weekReport && (
+            <div className="px-4 pb-4 text-center">
+              <span className="text-[14px] text-ios-secondary">Geen data voor deze week</span>
+            </div>
+          )}
+        </Card>
 
         {/* Points Ring + Streak */}
         <Card className="py-6 flex flex-col items-center gap-2">

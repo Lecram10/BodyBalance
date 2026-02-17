@@ -43,10 +43,14 @@ function AppContent() {
         // Bij fout gewoon doorgaan (offline scenario)
       }
 
-      // Sla email op in Firestore profiel (voor admin overzicht)
+      // Sla email op in Firestore (voor admin overzicht)
       if (user.email) {
         try {
           const { setDoc } = await import('firebase/firestore');
+          // Parent document aanmaken zodat admin panel users kan vinden
+          const userRef = doc(firestore, 'users', user.uid);
+          await setDoc(userRef, { email: user.email, lastLogin: new Date().toISOString() }, { merge: true });
+          // Ook in profile subcollectie
           const profileRef = doc(firestore, 'users', user.uid, 'profile', 'data');
           await setDoc(profileRef, { email: user.email }, { merge: true });
         } catch { /* ignore */ }

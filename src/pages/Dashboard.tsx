@@ -63,7 +63,17 @@ export function Dashboard() {
   const [streak, setStreak] = useState(0);
   const [weekReport, setWeekReport] = useState<WeekSummary | null>(null);
   const [weekReportOffset, setWeekReportOffset] = useState(0);
-  const [weekReportExpanded, setWeekReportExpanded] = useState(true);
+  const [weekReportExpanded, setWeekReportExpanded] = useState(() => {
+    // Op maandag bij eerste opening: uitgevouwen. Anders: ingeklapt.
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    if (dayOfWeek !== 1) return false; // Niet maandag → ingeklapt
+    const mondayStr = now.toISOString().split('T')[0];
+    const seenKey = `bb_weekreport_seen_${mondayStr}`;
+    if (localStorage.getItem(seenKey)) return false; // Al gezien → ingeklapt
+    localStorage.setItem(seenKey, '1');
+    return true; // Maandag, eerste keer → uitgevouwen
+  });
   const [editingEntry, setEditingEntry] = useState<MealEntry | null>(null);
 
   const loadWater = useCallback(async () => {

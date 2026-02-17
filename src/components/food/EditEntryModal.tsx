@@ -11,9 +11,11 @@ interface EditEntryModalProps {
 }
 
 export function EditEntryModal({ entry, onSave, onClose }: EditEntryModalProps) {
-  const [quantityG, setQuantityG] = useState(entry.quantityG);
-  const [quantity, setQuantity] = useState(entry.quantity || 1);
+  const [quantityGStr, setQuantityGStr] = useState(String(entry.quantityG));
+  const [quantityStr, setQuantityStr] = useState(String(entry.quantity || 1));
 
+  const quantityG = Number(quantityGStr) || 0;
+  const quantity = Math.round(Number(quantityStr)) || 0;
   const food = entry.foodItem;
   const unitLabel = food.unit === 'ml' ? 'ml' : 'gram';
   const unitShort = food.unit === 'ml' ? 'ml' : 'g';
@@ -80,15 +82,15 @@ export function EditEntryModal({ entry, onSave, onClose }: EditEntryModalProps) 
             <div className="flex items-center gap-3">
               <button
                 className="w-10 h-10 rounded-full bg-ios-bg text-ios-text border-none cursor-pointer text-xl font-medium active:bg-gray-200"
-                onClick={() => setQuantityG(Math.max(10, quantityG - 10))}
+                onClick={() => setQuantityGStr(String(Math.max(10, quantityG - 10)))}
               >
                 -
               </button>
               <div className="relative flex-1">
                 <input
                   type="number"
-                  value={quantityG}
-                  onChange={(e) => setQuantityG(Math.max(1, Number(e.target.value)))}
+                  value={quantityGStr}
+                  onChange={(e) => setQuantityGStr(e.target.value)}
                   className="text-center bg-white rounded-xl text-[20px] font-medium"
                   min={1}
                 />
@@ -98,7 +100,7 @@ export function EditEntryModal({ entry, onSave, onClose }: EditEntryModalProps) 
               </div>
               <button
                 className="w-10 h-10 rounded-full bg-ios-bg text-ios-text border-none cursor-pointer text-xl font-medium active:bg-gray-200"
-                onClick={() => setQuantityG(quantityG + 10)}
+                onClick={() => setQuantityGStr(String(quantityG + 10))}
               >
                 +
               </button>
@@ -113,15 +115,15 @@ export function EditEntryModal({ entry, onSave, onClose }: EditEntryModalProps) 
             <div className="flex items-center gap-3">
               <button
                 className="w-10 h-10 rounded-full bg-ios-bg text-ios-text border-none cursor-pointer text-xl font-medium active:bg-gray-200"
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                onClick={() => setQuantityStr(String(Math.max(1, quantity - 1)))}
               >
                 -
               </button>
               <div className="relative flex-1">
                 <input
                   type="number"
-                  value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, Math.round(Number(e.target.value))))}
+                  value={quantityStr}
+                  onChange={(e) => setQuantityStr(e.target.value)}
                   className="text-center bg-white rounded-xl text-[20px] font-medium"
                   min={1}
                 />
@@ -131,7 +133,7 @@ export function EditEntryModal({ entry, onSave, onClose }: EditEntryModalProps) 
               </div>
               <button
                 className="w-10 h-10 rounded-full bg-ios-bg text-ios-text border-none cursor-pointer text-xl font-medium active:bg-gray-200"
-                onClick={() => setQuantity(quantity + 1)}
+                onClick={() => setQuantityStr(String(quantity + 1))}
               >
                 +
               </button>
@@ -143,7 +145,7 @@ export function EditEntryModal({ entry, onSave, onClose }: EditEntryModalProps) 
             {[50, 100, 150, 200].map((g) => (
               <button
                 key={g}
-                onClick={() => setQuantityG(g)}
+                onClick={() => setQuantityGStr(String(g))}
                 className={`flex-1 py-2 rounded-xl text-[14px] font-medium border-none cursor-pointer transition-colors ${
                   quantityG === g
                     ? 'bg-primary text-white'

@@ -19,22 +19,25 @@ export function Onboarding() {
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender>('male');
   const [dateOfBirth, setDateOfBirth] = useState('1990-01-01');
-  const [heightCm, setHeightCm] = useState(175);
-  const [currentWeightKg, setCurrentWeightKg] = useState(80);
-  const [goalWeightKg, setGoalWeightKg] = useState(75);
+  const [heightCm, setHeightCm] = useState('175');
+  const [currentWeightKg, setCurrentWeightKg] = useState('80');
+  const [goalWeightKg, setGoalWeightKg] = useState('75');
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>('light');
   const [goal, setGoal] = useState<Goal>('lose');
 
-  const budget = calculateBudget(currentWeightKg, heightCm, dateOfBirth, gender, activityLevel, goal);
+  const numHeight = Number(heightCm) || 175;
+  const numWeight = Number(currentWeightKg) || 80;
+  const numGoal = Number(goalWeightKg) || 75;
+  const budget = calculateBudget(numWeight, numHeight, dateOfBirth, gender, activityLevel, goal);
 
   const handleFinish = async () => {
     await saveProfile({
       name,
       gender,
       dateOfBirth,
-      heightCm,
-      currentWeightKg,
-      goalWeightKg,
+      heightCm: numHeight,
+      currentWeightKg: numWeight,
+      goalWeightKg: numGoal,
       activityLevel,
       goal,
       dailyPointsBudget: budget.dailyPoints,
@@ -114,7 +117,7 @@ export function Onboarding() {
               type="number"
               suffix="cm"
               value={heightCm}
-              onChange={(e) => setHeightCm(Number(e.currentTarget.value))}
+              onChange={(e) => setHeightCm(e.currentTarget.value)}
               min={100}
               max={250}
             />
@@ -124,7 +127,7 @@ export function Onboarding() {
               type="number"
               suffix="kg"
               value={currentWeightKg}
-              onChange={(e) => setCurrentWeightKg(Number(e.currentTarget.value))}
+              onChange={(e) => setCurrentWeightKg(e.currentTarget.value)}
               min={30}
               max={300}
             />
@@ -134,7 +137,7 @@ export function Onboarding() {
               type="number"
               suffix="kg"
               value={goalWeightKg}
-              onChange={(e) => setGoalWeightKg(Number(e.currentTarget.value))}
+              onChange={(e) => setGoalWeightKg(e.currentTarget.value)}
               min={30}
               max={300}
             />

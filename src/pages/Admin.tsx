@@ -7,7 +7,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ArrowLeft, Plus, Users, KeyRound, Ban, CheckCircle, Copy, Check } from 'lucide-react';
 
-const ADMIN_EMAIL = 'bodybalanceapp@gmail.com';
+const ADMIN_EMAILS = ['bodybalanceapp@gmail.com', 'marcelvandernet@gmail.com'];
 
 interface InviteCode {
   code: string;
@@ -27,7 +27,8 @@ interface AppUser {
 }
 
 export function isAdmin(): boolean {
-  return auth.currentUser?.email === ADMIN_EMAIL;
+  const email = auth.currentUser?.email;
+  return email ? ADMIN_EMAILS.includes(email) : false;
 }
 
 export function Admin() {
@@ -270,7 +271,7 @@ export function Admin() {
                         </div>
                         <div className="text-[13px] text-ios-secondary truncate">{user.email}</div>
                       </div>
-                      {user.email !== ADMIN_EMAIL && (
+                      {!ADMIN_EMAILS.includes(user.email) && (
                         <button
                           onClick={() => handleToggleUser(user)}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border-none cursor-pointer ${

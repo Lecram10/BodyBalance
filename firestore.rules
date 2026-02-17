@@ -1,6 +1,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper: is dit een admin?
+    function isAdminUser() {
+      return request.auth != null && (
+        request.auth.token.email == 'bodybalanceapp@gmail.com' ||
+        request.auth.token.email == 'marcelvandernet@gmail.com'
+      );
+    }
+
     // Standaard: geen toegang
     match /{document=**} {
       allow read, write: if false;
@@ -9,14 +17,14 @@ service cloud.firestore {
     // Gebruikersdata: alleen eigen data lezen/schrijven
     match /users/{userId} {
       // Admin mag alle gebruikers lezen (voor admin panel)
-      allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'bodybalanceapp@gmail.com');
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdminUser());
       allow write: if request.auth != null && request.auth.uid == userId;
 
       // Subcollecties onder gebruiker
       match /{subcollection}/{docId} {
         // Admin mag profielen lezen + disabled veld schrijven
-        allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'bodybalanceapp@gmail.com');
-        allow write: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'bodybalanceapp@gmail.com');
+        allow read: if request.auth != null && (request.auth.uid == userId || isAdminUser());
+        allow write: if request.auth != null && (request.auth.uid == userId || isAdminUser());
       }
     }
 
@@ -26,7 +34,7 @@ service cloud.firestore {
       // Codes zijn 8-teken random strings, geen gevoelige data
       allow read: if true;
       // Schrijven: alleen admin (codes aanmaken/beheren)
-      allow write: if request.auth != null && request.auth.token.email == 'bodybalanceapp@gmail.com';
+      allow write: if isAdminUser();
       // Claimen: ingelogde gebruiker mag code markeren als gebruikt
       allow update: if request.auth != null
         && resource.data.usedBy == null

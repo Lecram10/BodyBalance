@@ -8,12 +8,9 @@ import { InputField, SelectField } from '../components/ui/FormField';
 import { calculateBudget } from '../lib/budget-calculator';
 import { db } from '../db/database';
 import { getAISettings, saveAISettings } from '../lib/ai-service';
-import type { WeightEntry } from '../types/user';
 import { ACTIVITY_LABELS, GOAL_LABELS } from '../types/user';
 import type { Gender, ActivityLevel, Goal } from '../types/user';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { format } from 'date-fns';
-import { nl } from 'date-fns/locale';
 import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor, LogOut, Shield } from 'lucide-react';
 import { useAuthStore } from '../store/auth-store';
 import { pushWeight, pushAll } from '../lib/firestore-sync';
@@ -23,7 +20,6 @@ import { isAdmin } from './Admin';
 export function Profile() {
   const navigate = useNavigate();
   const { profile, saveProfile, updateWeight } = useUserStore();
-  const [weightEntries, setWeightEntries] = useState<WeightEntry[]>([]);
   const [newWeight, setNewWeight] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
@@ -56,7 +52,6 @@ export function Profile() {
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    loadWeightEntries();
     loadAISettings();
     checkNotificationPermission();
   }, []);
@@ -72,11 +67,6 @@ export function Profile() {
       setEditGoal(profile.goal);
     }
   }, [profile]);
-
-  const loadWeightEntries = async () => {
-    const entries = await db.weightEntries.orderBy('date').toArray();
-    setWeightEntries(entries);
-  };
 
   const handleLogWeight = async () => {
     const weight = parseFloat(newWeight);
@@ -94,7 +84,6 @@ export function Profile() {
 
     await updateWeight(weight);
     setNewWeight('');
-    loadWeightEntries();
 
     // Sync naar Firestore
     const uid = useAuthStore.getState().user?.uid;
@@ -286,10 +275,6 @@ export function Profile() {
   if (!profile) return null;
 
   const weightDiff = profile.currentWeightKg - profile.goalWeightKg;
-  const chartData = weightEntries.map((e) => ({
-    date: format(new Date(e.date), 'd MMM', { locale: nl }),
-    gewicht: e.weightKg,
-  }));
 
   return (
     <PageLayout title="Profiel">
@@ -337,39 +322,6 @@ export function Profile() {
             </Button>
           </div>
         </Card>
-
-        {/* Weight chart */}
-        {chartData.length > 1 && (
-          <Card>
-            <CardHeader title="Gewichtsverloop" />
-            <div className="p-4">
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E5EA" />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 11, fill: '#8E8E93' }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11, fill: '#8E8E93' }}
-                    tickLine={false}
-                    domain={['dataMin - 1', 'dataMax + 1']}
-                  />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="gewicht"
-                    stroke="#34C759"
-                    strokeWidth={2.5}
-                    dot={{ fill: '#34C759', r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        )}
 
         {/* Budget info */}
         <Card>

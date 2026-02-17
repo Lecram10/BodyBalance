@@ -8,12 +8,29 @@ service cloud.firestore {
 
     // Gebruikersdata: alleen eigen data lezen/schrijven
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Admin mag alle gebruikers lezen (voor admin panel)
+      allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'bodybalanceapp@gmail.com');
+      allow write: if request.auth != null && request.auth.uid == userId;
 
       // Subcollecties onder gebruiker
       match /{subcollection}/{docId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        // Admin mag profielen lezen + disabled veld schrijven
+        allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'bodybalanceapp@gmail.com');
+        allow write: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'bodybalanceapp@gmail.com');
       }
+    }
+
+    // Invite codes
+    match /inviteCodes/{code} {
+      // Lezen: iedereen (nodig voor validatie bij registratie, voordat user is ingelogd)
+      // Codes zijn 8-teken random strings, geen gevoelige data
+      allow read: if true;
+      // Schrijven: alleen admin (codes aanmaken/beheren)
+      allow write: if request.auth != null && request.auth.token.email == 'bodybalanceapp@gmail.com';
+      // Claimen: ingelogde gebruiker mag code markeren als gebruikt
+      allow update: if request.auth != null
+        && resource.data.usedBy == null
+        && request.resource.data.usedBy == request.auth.uid;
     }
   }
 }

@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
+import { firestore } from './lib/firebase';
 import { useUserStore } from './store/user-store';
 import { useAuthStore } from './store/auth-store';
 import { pullAll, pushAll } from './lib/firestore-sync';
@@ -12,6 +14,7 @@ import { Scan } from './pages/Scan';
 import { Statistics } from './pages/Statistics';
 import { AIChat } from './pages/AIChat';
 import { Profile } from './pages/Profile';
+import { Admin } from './pages/Admin';
 import { WifiOff, RefreshCw } from 'lucide-react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
@@ -26,8 +29,29 @@ function AppContent() {
       return;
     }
 
-    // Bij login: profiel direct laden, sync op achtergrond
+    // Bij login: check of account actief is, profiel laden, sync
     const doSync = async () => {
+      // Check of account geblokkeerd is
+      try {
+        const profileRef = doc(firestore, 'users', user.uid, 'profile', 'data');
+        const profileSnap = await getDoc(profileRef);
+        if (profileSnap.exists() && profileSnap.data().disabled === true) {
+          useAuthStore.getState().logout();
+          return;
+        }
+      } catch {
+        // Bij fout gewoon doorgaan (offline scenario)
+      }
+
+      // Sla email op in Firestore profiel (voor admin overzicht)
+      if (user.email) {
+        try {
+          const { setDoc } = await import('firebase/firestore');
+          const profileRef = doc(firestore, 'users', user.uid, 'profile', 'data');
+          await setDoc(profileRef, { email: user.email }, { merge: true });
+        } catch { /* ignore */ }
+      }
+
       // Laad profiel eerst → UI toont meteen
       await loadProfile();
 
@@ -91,6 +115,7 @@ function AppContent() {
         <Route path="/statistics" element={<Statistics />} />
         <Route path="/ai-chat" element={<AIChat />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />

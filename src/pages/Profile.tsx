@@ -14,10 +14,11 @@ import type { Gender, ActivityLevel, Goal } from '../types/user';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor, LogOut } from 'lucide-react';
+import { Scale, TrendingDown, Target, Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor, LogOut, Shield } from 'lucide-react';
 import { useAuthStore } from '../store/auth-store';
 import { pushWeight, pushAll } from '../lib/firestore-sync';
 import { auth } from '../lib/firebase';
+import { isAdmin } from './Admin';
 
 export function Profile() {
   const navigate = useNavigate();
@@ -675,6 +676,22 @@ export function Profile() {
             </p>
           </div>
         </Card>
+
+        {/* Admin (alleen voor admin) */}
+        {isAdmin() && (
+          <button
+            onClick={() => navigate('/admin')}
+            className="flex items-center gap-3 w-full p-4 bg-white dark:bg-ios-card rounded-2xl shadow-sm border-none cursor-pointer active:bg-gray-50 text-left"
+          >
+            <div className="w-10 h-10 rounded-full bg-ios-blue/10 flex items-center justify-center">
+              <Shield size={20} className="text-ios-blue" />
+            </div>
+            <div className="flex-1">
+              <div className="text-[15px] font-semibold">Admin Panel</div>
+              <div className="text-[13px] text-ios-secondary">Invite codes en gebruikersbeheer</div>
+            </div>
+          </button>
+        )}
 
         {/* Uitloggen */}
         <Button

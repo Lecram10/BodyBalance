@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { firestore } from '../lib/firebase';
 import { useAuthStore } from '../store/auth-store';
 import { Button } from '../components/ui/Button';
-import { Scale, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Scale, Mail, Lock, Eye, EyeOff, Ticket } from 'lucide-react';
 
 type Mode = 'login' | 'register';
 
@@ -11,6 +13,7 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState('');
@@ -21,6 +24,7 @@ export function Login() {
     setLocalError('');
     setPassword('');
     setConfirmPassword('');
+    setInviteCode('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,13 +45,48 @@ export function Login() {
         setLocalError('Wachtwoorden komen niet overeen');
         return;
       }
+      if (!inviteCode.trim()) {
+        setLocalError('Vul een invite code in');
+        return;
+      }
     }
 
     setIsSubmitting(true);
     if (mode === 'login') {
       await login(email.trim(), password);
     } else {
-      await register(email.trim(), password);
+      // Valideer invite code
+      try {
+        const codeRef = doc(firestore, 'inviteCodes', inviteCode.trim().toUpperCase());
+        const codeSnap = await getDoc(codeRef);
+        if (!codeSnap.exists()) {
+          setLocalError('Ongeldige invite code');
+          setIsSubmitting(false);
+          return;
+        }
+        if (codeSnap.data().usedBy) {
+          setLocalError('Deze invite code is al gebruikt');
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Code is geldig → registreer
+        await register(email.trim(), password);
+
+        // Markeer code als gebruikt (fire-and-forget)
+        const { currentUser } = await import('../lib/firebase').then((m) => m.auth);
+        if (currentUser) {
+          updateDoc(codeRef, {
+            usedBy: currentUser.uid,
+            usedEmail: email.trim(),
+            usedAt: new Date().toISOString(),
+          }).catch(() => {});
+        }
+      } catch {
+        setLocalError('Kon invite code niet controleren. Probeer opnieuw.');
+        setIsSubmitting(false);
+        return;
+      }
     }
     setIsSubmitting(false);
   };
@@ -104,19 +143,32 @@ export function Login() {
           </button>
         </div>
 
-        {/* Confirm password (register only) */}
+        {/* Confirm password + invite code (register only) */}
         {mode === 'register' && (
-          <div className="relative">
-            <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ios-secondary" />
-            <input
-              type={showPassword ? 'text' : 'password'}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Wachtwoord bevestigen"
-              autoComplete="new-password"
-              className="w-full bg-white rounded-xl py-3.5 pl-12 pr-4 text-[17px] text-ios-text border border-ios-separator placeholder:text-ios-secondary/50 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
-            />
-          </div>
+          <>
+            <div className="relative">
+              <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ios-secondary" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Wachtwoord bevestigen"
+                autoComplete="new-password"
+                className="w-full bg-white rounded-xl py-3.5 pl-12 pr-4 text-[17px] text-ios-text border border-ios-separator placeholder:text-ios-secondary/50 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+              />
+            </div>
+            <div className="relative">
+              <Ticket size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ios-secondary" />
+              <input
+                type="text"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                placeholder="Invite code"
+                autoComplete="off"
+                className="w-full bg-white rounded-xl py-3.5 pl-12 pr-4 text-[17px] text-ios-text border border-ios-separator placeholder:text-ios-secondary/50 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors font-mono tracking-wider"
+              />
+            </div>
+          </>
         )}
 
         {/* Error */}

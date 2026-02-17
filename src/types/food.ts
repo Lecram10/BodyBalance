@@ -46,7 +46,7 @@ export const MEAL_TYPE_LABELS: Record<MealType, string> = {
   breakfast: 'Ontbijt',
   lunch: 'Lunch',
   dinner: 'Diner',
-  snack: 'Snacks',
+  snack: 'Tussendoor',
 };
 
 export const MEAL_TYPE_ICONS: Record<MealType, string> = {

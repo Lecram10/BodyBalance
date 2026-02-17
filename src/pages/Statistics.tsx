@@ -51,8 +51,8 @@ export function Statistics() {
     setWaterWeekData(waterDays);
 
     // Maaltijd verdeling (deze week)
-    const mealTotals: Record<string, number> = { Ontbijt: 0, Lunch: 0, Diner: 0, Snacks: 0 };
-    const mealTypeMap: Record<string, string> = { breakfast: 'Ontbijt', lunch: 'Lunch', dinner: 'Diner', snack: 'Snacks' };
+    const mealTotals: Record<string, number> = { Ontbijt: 0, Lunch: 0, Diner: 0, Tussendoor: 0 };
+    const mealTypeMap: Record<string, string> = { breakfast: 'Ontbijt', lunch: 'Lunch', dinner: 'Diner', snack: 'Tussendoor' };
 
     for (let i = 0; i < 7; i++) {
       const d = addDays(monday, i);
@@ -61,7 +61,7 @@ export function Statistics() {
       if (log?.id) {
         const entries: MealEntry[] = await db.mealEntries.where('dailyLogId').equals(log.id).toArray();
         for (const entry of entries) {
-          const label = mealTypeMap[entry.mealType] || 'Snacks';
+          const label = mealTypeMap[entry.mealType] || 'Tussendoor';
           mealTotals[label] += entry.points;
         }
       }

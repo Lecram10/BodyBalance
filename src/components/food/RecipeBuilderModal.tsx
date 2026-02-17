@@ -1,9 +1,9 @@
-import { useState, useCallback, useRef } from 'react';
-import { X, Search, Plus, Minus, Loader2 } from 'lucide-react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { X, Search, Plus, Minus, Loader2, Heart, Clock } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { calculatePointsPer100g } from '../../lib/points-calculator';
-import { saveCustomFood } from '../../db/database';
-import { searchFood } from '../../lib/food-api';
+import { saveCustomFood, getRecentFoods, getFavoriteFoods } from '../../db/database';
+import { searchFood, searchLocalFoods, searchUserFoods } from '../../lib/food-api';
 import type { FoodItem, NutritionPer100g } from '../../types/food';
 
 interface Ingredient {
@@ -22,14 +22,50 @@ export function RecipeBuilderModal({ onCreated, onClose }: RecipeBuilderModalPro
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [favorites, setFavorites] = useState<FoodItem[]>([]);
+  const [recentFoods, setRecentFoods] = useState<FoodItem[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    getFavoriteFoods().then(setFavorites);
+    getRecentFoods(10).then(setRecentFoods);
+  }, []);
 
   const doSearch = useCallback(async (q: string) => {
     if (q.length < 2) { setSearchResults([]); return; }
+
+    // Annuleer vorige zoekopdracht
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    // Stap 1: lokale + user producten (direct)
+    const localResults = searchLocalFoods(q);
+    const userResults = await searchUserFoods(q);
+    const existingNames = new Set(localResults.map((r) => r.name.toLowerCase()));
+    const combined = [...localResults];
+    for (const item of userResults) {
+      if (!existingNames.has(item.name.toLowerCase())) {
+        combined.push(item);
+        existingNames.add(item.name.toLowerCase());
+      }
+    }
+    if (!controller.signal.aborted && combined.length > 0) {
+      setSearchResults(combined);
+    }
+
+    // Stap 2: API resultaten
     setIsSearching(true);
-    const items = await searchFood(q);
-    setSearchResults(items);
-    setIsSearching(false);
+    try {
+      const items = await searchFood(q, controller.signal, combined);
+      if (!controller.signal.aborted) {
+        setSearchResults(items);
+        setIsSearching(false);
+      }
+    } catch {
+      if (!controller.signal.aborted) setIsSearching(false);
+    }
   }, []);
 
   const handleSearchChange = (value: string) => {
@@ -171,6 +207,50 @@ export function RecipeBuilderModal({ onCreated, onClose }: RecipeBuilderModalPro
                   <span className="text-ios-secondary text-[12px] ml-auto flex-shrink-0">{food.pointsPer100g} pt</span>
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* Favorieten & recent (als er geen zoekopdracht is) */}
+          {searchQuery.length < 2 && (favorites.length > 0 || recentFoods.length > 0) && (
+            <div className="bg-white border border-ios-separator rounded-xl mb-3 max-h-48 overflow-y-auto">
+              {favorites.length > 0 && (
+                <>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-ios-bg">
+                    <Heart size={12} className="text-ios-destructive" />
+                    <span className="text-[12px] font-semibold text-ios-secondary uppercase tracking-wide">Favorieten</span>
+                  </div>
+                  {favorites.slice(0, 5).map((food, i) => (
+                    <button
+                      key={`fav-${food.name}-${i}`}
+                      onClick={() => addIngredient(food)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left bg-transparent border-none cursor-pointer active:bg-gray-50 text-[14px]"
+                    >
+                      <Plus size={14} className="text-primary flex-shrink-0" />
+                      <span className="truncate">{food.name}</span>
+                      <span className="text-ios-secondary text-[12px] ml-auto flex-shrink-0">{food.pointsPer100g} pt</span>
+                    </button>
+                  ))}
+                </>
+              )}
+              {recentFoods.length > 0 && (
+                <>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-ios-bg">
+                    <Clock size={12} className="text-ios-blue" />
+                    <span className="text-[12px] font-semibold text-ios-secondary uppercase tracking-wide">Recent</span>
+                  </div>
+                  {recentFoods.slice(0, 5).map((food, i) => (
+                    <button
+                      key={`recent-${food.name}-${i}`}
+                      onClick={() => addIngredient(food)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left bg-transparent border-none cursor-pointer active:bg-gray-50 text-[14px]"
+                    >
+                      <Plus size={14} className="text-primary flex-shrink-0" />
+                      <span className="truncate">{food.name}</span>
+                      <span className="text-ios-secondary text-[12px] ml-auto flex-shrink-0">{food.pointsPer100g} pt</span>
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           )}
 

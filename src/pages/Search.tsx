@@ -429,7 +429,7 @@ function FavoritesTab({
 }
 
 function ZeroPointTab({ onSelect }: { onSelect: (food: FoodItem) => void }) {
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(ZERO_POINT_CATEGORIES[0]?.name ?? null);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   const createZeroPointFood = (name: string): FoodItem => ({
     name,

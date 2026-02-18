@@ -59,7 +59,7 @@ function AppContent() {
 
       // Check of lokale data bij dit account hoort
       const lastUid = localStorage.getItem('bb_current_uid');
-      if (lastUid && lastUid !== user.uid) {
+      if (lastUid !== user.uid) {
         // Ander account → lokale data wissen
         await db.transaction('rw', [db.userProfiles, db.foodItems, db.mealEntries, db.dailyLogs, db.weightEntries], async () => {
           await db.userProfiles.clear();

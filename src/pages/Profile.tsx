@@ -11,7 +11,7 @@ import { getAISettings, saveAISettings } from '../lib/ai-service';
 import { ACTIVITY_LABELS, GOAL_LABELS } from '../types/user';
 import type { Gender, ActivityLevel, Goal } from '../types/user';
 import { format } from 'date-fns';
-import { Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor, LogOut, Shield } from 'lucide-react';
+import { Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor, LogOut, Shield, TrendingDown, Trophy } from 'lucide-react';
 import { useAuthStore } from '../store/auth-store';
 import { pushWeight, pushAll } from '../lib/firestore-sync';
 import { auth } from '../lib/firebase';
@@ -46,6 +46,9 @@ export function Profile() {
   const [theme, setTheme] = useState<'auto' | 'light' | 'dark'>(() => {
     return (localStorage.getItem('bb_theme') as 'auto' | 'light' | 'dark') || 'auto';
   });
+
+  // Weight feedback
+  const [weightFeedback, setWeightFeedback] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
   // Export/import
   const [exportStatus, setExportStatus] = useState<string | null>(null);
@@ -82,8 +85,25 @@ export function Profile() {
       await db.weightEntries.add({ date: today, weightKg: weight });
     }
 
-    await updateWeight(weight);
+    const result = await updateWeight(weight);
     setNewWeight('');
+
+    // Toon feedback als budget veranderd is of doel bereikt
+    if (result) {
+      if (result.goalReached) {
+        setWeightFeedback({
+          message: `Gefeliciteerd! Je hebt je streefgewicht bereikt! Je budget is verhoogd naar ${result.newDailyBudget} punten per dag.`,
+          type: 'success',
+        });
+        setTimeout(() => setWeightFeedback(null), 8000);
+      } else if (result.newDailyBudget !== result.oldDailyBudget) {
+        setWeightFeedback({
+          message: `Je budget is aangepast naar ${result.newDailyBudget} punten per dag (was ${result.oldDailyBudget}).`,
+          type: 'info',
+        });
+        setTimeout(() => setWeightFeedback(null), 6000);
+      }
+    }
 
     // Sync naar Firestore
     const uid = useAuthStore.getState().user?.uid;
@@ -301,6 +321,22 @@ export function Profile() {
             </Button>
           </div>
         </Card>
+
+        {/* Weight feedback */}
+        {weightFeedback && (
+          <Card className={weightFeedback.type === 'success' ? 'bg-primary/10 border border-primary/20' : 'bg-ios-blue/10 border border-ios-blue/20'}>
+            <div className="px-4 py-3 flex items-start gap-3">
+              {weightFeedback.type === 'success' ? (
+                <Trophy size={20} className="text-primary flex-shrink-0 mt-0.5" />
+              ) : (
+                <TrendingDown size={20} className="text-ios-blue flex-shrink-0 mt-0.5" />
+              )}
+              <p className={`text-[14px] font-medium ${weightFeedback.type === 'success' ? 'text-primary' : 'text-ios-blue'}`}>
+                {weightFeedback.message}
+              </p>
+            </div>
+          </Card>
+        )}
 
         {/* Budget info */}
         <Card>

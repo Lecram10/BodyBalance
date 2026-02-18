@@ -5,7 +5,8 @@ import { firestore, auth } from '../lib/firebase';
 import { PageLayout } from '../components/layout/PageLayout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { ArrowLeft, Plus, Users, KeyRound, Ban, CheckCircle, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Plus, Users, KeyRound, Ban, CheckCircle, Copy, Check, RotateCcw } from 'lucide-react';
+import { resetUserData } from '../lib/firestore-sync';
 
 const ADMIN_EMAILS = ['bodybalanceapp@gmail.com', 'marcelvandernet@gmail.com'];
 
@@ -38,6 +39,8 @@ export function Admin() {
   const [newLabel, setNewLabel] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [resettingUser, setResettingUser] = useState<string | null>(null);
+  const [resetDone, setResetDone] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdmin()) {
@@ -151,6 +154,22 @@ export function Admin() {
       ));
     } catch (err) {
       console.warn('[Admin] Toggle user failed:', err);
+    }
+  };
+
+  const handleResetUser = async (user: AppUser) => {
+    if (!confirm(`Weet je zeker dat je alle data van ${user.email} wilt wissen? De gebruiker moet opnieuw door onboarding.`)) return;
+    try {
+      setResettingUser(user.userId);
+      await resetUserData(user.userId);
+      setResettingUser(null);
+      setResetDone(user.userId);
+      setTimeout(() => setResetDone(null), 3000);
+      // Herlaad users (naam wordt 'Onbekend' na reset)
+      await loadUsers();
+    } catch (err) {
+      console.warn('[Admin] Reset user failed:', err);
+      setResettingUser(null);
     }
   };
 
@@ -271,22 +290,36 @@ export function Admin() {
                         </div>
                         <div className="text-[13px] text-ios-secondary truncate">{user.email}</div>
                       </div>
-                      {!ADMIN_EMAILS.includes(user.email) && (
-                        <button
-                          onClick={() => handleToggleUser(user)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border-none cursor-pointer ${
-                            user.disabled
-                              ? 'bg-primary/10 text-primary'
-                              : 'bg-ios-destructive/10 text-ios-destructive'
-                          }`}
-                        >
-                          {user.disabled ? (
-                            <><CheckCircle size={14} /> Activeer</>
-                          ) : (
-                            <><Ban size={14} /> Blokkeer</>
-                          )}
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {resetDone === user.userId ? (
+                          <span className="text-[13px] text-primary font-medium">Data gewist</span>
+                        ) : (
+                          <button
+                            onClick={() => handleResetUser(user)}
+                            disabled={resettingUser === user.userId}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[13px] font-medium border-none cursor-pointer bg-ios-warning/10 text-ios-warning"
+                          >
+                            <RotateCcw size={14} className={resettingUser === user.userId ? 'animate-spin' : ''} />
+                            Reset
+                          </button>
+                        )}
+                        {!ADMIN_EMAILS.includes(user.email) && (
+                          <button
+                            onClick={() => handleToggleUser(user)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium border-none cursor-pointer ${
+                              user.disabled
+                                ? 'bg-primary/10 text-primary'
+                                : 'bg-ios-destructive/10 text-ios-destructive'
+                            }`}
+                          >
+                            {user.disabled ? (
+                              <><CheckCircle size={14} /> Activeer</>
+                            ) : (
+                              <><Ban size={14} /> Blokkeer</>
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

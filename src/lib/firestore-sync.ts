@@ -159,6 +159,29 @@ export async function deleteWeight(userId: string, date: string): Promise<void> 
 // ─── Pull: Firestore → lokaal ───────────────────────────────
 
 /**
+ * Verwijder alle Firestore data van een gebruiker (admin functie).
+ * Wist: profile, days, weight, foods subcollecties.
+ */
+export async function resetUserData(userId: string): Promise<void> {
+  const subcollections = ['profile', 'days', 'weight', 'foods'];
+
+  for (const sub of subcollections) {
+    const snap = await getDocs(collection(firestore, 'users', userId, sub));
+    for (const d of snap.docs) {
+      await deleteDoc(doc(firestore, 'users', userId, sub, d.id));
+    }
+  }
+
+  // Parent document updaten (behoud email voor admin panel, wis rest)
+  const userRef = doc(firestore, 'users', userId);
+  const userSnap = await getDoc(userRef);
+  if (userSnap.exists()) {
+    const data = userSnap.data();
+    await setDoc(userRef, { email: data.email || '', lastLogin: data.lastLogin || '' });
+  }
+}
+
+/**
  * Pull alle data van Firestore en merge met lokale IndexedDB.
  * Alleen data die nieuwer is dan lokaal wordt overgenomen.
  */

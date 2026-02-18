@@ -5,6 +5,7 @@ import { firestore } from './lib/firebase';
 import { useUserStore } from './store/user-store';
 import { useAuthStore } from './store/auth-store';
 import { pullAll, pushAll } from './lib/firestore-sync';
+import { db } from './db/database';
 import { BottomNav } from './components/layout/BottomNav';
 import { Login } from './pages/Login';
 import { Onboarding } from './pages/Onboarding';
@@ -55,6 +56,20 @@ function AppContent() {
           await setDoc(profileRef, { email: user.email }, { merge: true });
         } catch { /* ignore */ }
       }
+
+      // Check of lokale data bij dit account hoort
+      const lastUid = localStorage.getItem('bb_current_uid');
+      if (lastUid && lastUid !== user.uid) {
+        // Ander account → lokale data wissen
+        await db.transaction('rw', [db.userProfiles, db.foodItems, db.mealEntries, db.dailyLogs, db.weightEntries], async () => {
+          await db.userProfiles.clear();
+          await db.foodItems.clear();
+          await db.mealEntries.clear();
+          await db.dailyLogs.clear();
+          await db.weightEntries.clear();
+        });
+      }
+      localStorage.setItem('bb_current_uid', user.uid);
 
       // Laad profiel eerst → UI toont meteen
       await loadProfile();

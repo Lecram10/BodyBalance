@@ -459,3 +459,33 @@ export async function calculateStreak(dailyBudget: number): Promise<number> {
 
   return streak;
 }
+
+/**
+ * Haal de gewichtstrend op: laatste meting en verschil met 7 dagen geleden.
+ */
+export interface WeightTrend {
+  currentKg: number;
+  weekChangeKg: number | null; // null als er geen eerdere meting is
+}
+
+export async function getWeightTrend(): Promise<WeightTrend | null> {
+  // Laatste gewichtsmeting
+  const all = await db.weightEntries.orderBy('date').reverse().toArray();
+  if (all.length === 0) return null;
+
+  const latest = all[0];
+
+  // Zoek meting van ~7 dagen geleden (dichtstbijzijnde)
+  const today = new Date(latest.date);
+  const weekAgo = new Date(today);
+  weekAgo.setDate(today.getDate() - 7);
+  const weekAgoStr = weekAgo.toISOString().split('T')[0];
+
+  // Zoek de meest recente meting op of vóór 7 dagen geleden
+  const older = all.find((w) => w.date <= weekAgoStr);
+
+  return {
+    currentKg: latest.weightKg,
+    weekChangeKg: older ? latest.weightKg - older.weightKg : null,
+  };
+}

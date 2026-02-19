@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useUserStore } from '../store/user-store';
 import { useMealStore } from '../store/meal-store';
-import { getWeeklyPointsUsed, getWaterIntake, addWaterIntake, resetWaterIntake, copyDayEntries, getWeekSummary, calculateStreak } from '../db/database';
-import type { WeekSummary } from '../db/database';
+import { getWeeklyPointsUsed, getWaterIntake, addWaterIntake, resetWaterIntake, copyDayEntries, getWeekSummary, calculateStreak, getWeightTrend } from '../db/database';
+import type { WeekSummary, WeightTrend } from '../db/database';
 import { PageLayout } from '../components/layout/PageLayout';
 import { PointsRing } from '../components/points/PointsRing';
 import { MealSection } from '../components/food/MealSection';
@@ -10,7 +10,7 @@ import { EditEntryModal } from '../components/food/EditEntryModal';
 import { Card } from '../components/ui/Card';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Droplets, GlassWater, Coffee, RotateCcw, Copy, Bookmark, X, Flame, Trophy, TrendingDown, TrendingUp, Minus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Droplets, GlassWater, Coffee, RotateCcw, Copy, Bookmark, X, Flame, Trophy, TrendingDown, TrendingUp, Minus, Scale } from 'lucide-react';
 import type { FoodItem, MealEntry, MealType } from '../types/food';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -75,6 +75,7 @@ export function Dashboard() {
     return true; // Maandag, eerste keer → uitgevouwen
   });
   const [editingEntry, setEditingEntry] = useState<MealEntry | null>(null);
+  const [weightTrend, setWeightTrend] = useState<WeightTrend | null>(null);
 
   const loadWater = useCallback(async () => {
     const ml = await getWaterIntake(selectedDate);
@@ -103,6 +104,11 @@ export function Dashboard() {
       calculateStreak(profile.dailyPointsBudget).then(setStreak);
     }
   }, [profile, entries]);
+
+  // Gewichtstrend laden
+  useEffect(() => {
+    getWeightTrend().then(setWeightTrend);
+  }, [profile]);
 
   // Weekrapport: dynamisch op basis van weekReportOffset
   useEffect(() => {
@@ -309,15 +315,33 @@ export function Dashboard() {
           )}
         </Card>
 
-        {/* Points Ring + Streak */}
+        {/* Points Ring + Streak + Weight */}
         <Card className="py-6 flex flex-col items-center gap-2">
           <PointsRing used={totalUsed} budget={profile.dailyPointsBudget} />
-          {streak > 0 && (
-            <div className="flex items-center gap-1.5 mt-1">
-              <Flame size={16} className="text-orange-500" />
-              <span className="text-[14px] font-medium text-ios-secondary">{streak} {streak === 1 ? 'dag' : 'dagen'} op rij</span>
-            </div>
-          )}
+          <div className="flex items-center gap-4 mt-1">
+            {streak > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Flame size={16} className="text-orange-500" />
+                <span className="text-[14px] font-medium text-ios-secondary">{streak} {streak === 1 ? 'dag' : 'dagen'} op rij</span>
+              </div>
+            )}
+            {weightTrend && (
+              <div className="flex items-center gap-1.5">
+                <Scale size={16} className="text-ios-secondary" />
+                <span className="text-[14px] font-medium text-ios-secondary">
+                  {weightTrend.currentKg.toFixed(1)} kg
+                </span>
+                {weightTrend.weekChangeKg !== null && (
+                  <span className={`text-[13px] font-medium flex items-center gap-0.5 ${
+                    weightTrend.weekChangeKg < 0 ? 'text-primary' : weightTrend.weekChangeKg > 0 ? 'text-ios-warning' : 'text-ios-secondary'
+                  }`}>
+                    {weightTrend.weekChangeKg < 0 ? <TrendingDown size={13} /> : weightTrend.weekChangeKg > 0 ? <TrendingUp size={13} /> : <Minus size={13} />}
+                    {weightTrend.weekChangeKg > 0 ? '+' : ''}{weightTrend.weekChangeKg.toFixed(1)}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </Card>
 
         {/* Streak milestone */}

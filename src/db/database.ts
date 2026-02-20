@@ -3,6 +3,7 @@ import type { FoodItem, MealEntry } from '../types/food';
 import type { UserProfile, WeightEntry, DailyLog } from '../types/user';
 import { auth } from '../lib/firebase';
 import { pushDay, pushFood } from '../lib/firestore-sync';
+import { getDrinkWaterPercentage } from '../lib/drink-water-mapping';
 
 /** Haal de huidige Firebase user ID op (null als niet ingelogd). */
 function getUid(): string | null {
@@ -96,15 +97,33 @@ export async function addMealEntry(
   return id as number;
 }
 
-// Helper: update een bestaande maaltijdentry (aantal, hoeveelheid, punten)
+// Helper: update een bestaande maaltijdentry (aantal, hoeveelheid, punten).
+// Herberekent ook waterMlAdded als het een drank is.
+// Retourneert true als waterinname is gewijzigd.
 export async function updateMealEntry(
   entryId: number,
   updates: { quantityG: number; quantity?: number; points: number }
-): Promise<void> {
+): Promise<boolean> {
   const entry = await db.mealEntries.get(entryId);
-  if (!entry) return;
+  if (!entry) return false;
 
-  await db.mealEntries.update(entryId, updates);
+  // Herbereken waterMlAdded als de entry een drank was
+  const oldWater = entry.waterMlAdded ?? 0;
+  let newWater = 0;
+  let waterChanged = false;
+
+  if (oldWater > 0) {
+    // Entry had water → herbereken op basis van nieuwe hoeveelheid
+    const drinkPct = getDrinkWaterPercentage(entry.foodItem.name);
+    const newVolume = updates.quantityG * (updates.quantity || 1);
+    newWater = drinkPct > 0 ? Math.round(newVolume * drinkPct) : 0;
+    waterChanged = newWater !== oldWater;
+  }
+
+  await db.mealEntries.update(entryId, {
+    ...updates,
+    ...(oldWater > 0 ? { waterMlAdded: newWater } : {}),
+  });
 
   // Herbereken daglog totaal
   if (entry.dailyLogId) {
@@ -113,12 +132,20 @@ export async function updateMealEntry(
       .equals(entry.dailyLogId)
       .toArray();
     const totalPoints = entries.reduce((sum, e) => sum + (e.id === entryId ? updates.points : e.points), 0);
-    await db.dailyLogs.update(entry.dailyLogId, { totalPointsUsed: totalPoints });
 
-    // Sync de dag waar deze entry bij hoort
     const log = await db.dailyLogs.get(entry.dailyLogId);
-    if (log) syncDay(log.date);
+    if (log) {
+      const logUpdates: { totalPointsUsed: number; waterMl?: number } = { totalPointsUsed: totalPoints };
+      if (waterChanged) {
+        const delta = newWater - oldWater;
+        logUpdates.waterMl = Math.max(0, (log.waterMl ?? 0) + delta);
+      }
+      await db.dailyLogs.update(entry.dailyLogId, logUpdates);
+      syncDay(log.date);
+    }
   }
+
+  return waterChanged;
 }
 
 // Helper: verwijder maaltijdentry en update daglog.

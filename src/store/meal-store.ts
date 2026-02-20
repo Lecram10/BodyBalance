@@ -40,7 +40,10 @@ export const useMealStore = create<MealState>((set, get) => ({
   },
 
   updateEntry: async (id, updates) => {
-    await updateMealEntry(id, updates);
+    const waterChanged = await updateMealEntry(id, updates);
+    if (waterChanged) {
+      window.dispatchEvent(new CustomEvent('water-changed'));
+    }
     await get().loadEntries();
   },
 

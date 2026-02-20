@@ -33,6 +33,19 @@ firebase deploy      # Deploy hosting + Firestore rules
 - **Weekly points**: dailyPoints × 1.4
 - Budget auto-recalculates on weight log; auto-switches to 'maintain' when goal weight is reached
 
+### Drink → Water Intake
+- When a drink is added as a meal entry, its volume is auto-added to water intake
+- `src/lib/drink-water-mapping.ts` — keyword-based detection using `\b` word-boundary regex (same pattern as `isZeroPointFood()`)
+- **100%**: thee, koffie (zwart/met melk), espresso, zero-sugar frisdrank, bouillon
+- **50%**: cappuccino, latte, melk, sap, frisdrank, smoothie, sportdrank
+- **0%**: alcohol (bier, wijn, sterke drank), energiedranken
+- Detection is on **name only** — local foods (`dutch-foods.ts`) have no `unit` field, so don't gate on `unit === 'ml'`
+- Toast with undo via `water-toast-store.ts` → `WaterToast.tsx`; Dashboard listens for `water-changed` CustomEvent
+
+### Cross-Component Communication
+- **`water-changed` CustomEvent**: dispatched after drink→water auto-add or undo; Dashboard listens to refresh water display
+- **`themechange` CustomEvent**: dispatched from Profile theme toggle; App.tsx listens to apply dark mode
+
 ### Key Files
 - `src/App.tsx` — Router, auth gate, sync orchestration, notification scheduler, theme watcher
 - `src/store/user-store.ts` — Profile + weight management with budget recalculation
@@ -42,6 +55,8 @@ firebase deploy      # Deploy hosting + Firestore rules
 - `src/lib/budget-calculator.ts` — BMR, TDEE, points budget calculation
 - `src/lib/points-calculator.ts` — Food points formula
 - `src/lib/food-api.ts` — Open Food Facts API (NL filter: `tagtype_0=countries`)
+- `src/lib/drink-water-mapping.ts` — Drink name → water percentage mapping
+- `src/lib/dutch-foods.ts` — Local NL food database (no `unit` field — all use grams/servingSizeG)
 - `src/pages/Admin.tsx` — Invite codes, user management, data reset (admin-only)
 
 ### Firebase
@@ -56,7 +71,8 @@ firebase deploy      # Deploy hosting + Firestore rules
 - Dexie boolean index: use `.filter()` not `.equals(1)`
 - `useRef<T>(null)` required in React 19
 - Open Food Facts: `tagtype_0=countries` for NL filter (not `cc=nl`)
-- `isZeroPointFood()`: use `\b` word-boundary regex, not `.includes()`
+- `isZeroPointFood()` and `getDrinkWaterPercentage()`: use `\b` word-boundary regex, not `.includes()`
+- Local foods (`dutch-foods.ts`) have NO `unit` field — only API foods get `unit: 'ml'` via `detectUnit()`
 - Html5Qrcode: needs visible DOM element — use `overflow: hidden` + `minHeight: 0`, not `display: none`
 - `navigator.permissions.query({name:'camera'})` doesn't work on iOS Safari — use `getUserMedia()` directly
 - Dark mode is class-based (`html.dark`), managed via JS, not media query

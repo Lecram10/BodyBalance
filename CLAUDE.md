@@ -40,10 +40,12 @@ firebase deploy      # Deploy hosting + Firestore rules
 - **50%**: cappuccino, latte, melk, sap, frisdrank, smoothie, sportdrank
 - **0%**: alcohol (bier, wijn, sterke drank), energiedranken
 - Detection is on **name only** — local foods (`dutch-foods.ts`) have no `unit` field, so don't gate on `unit === 'ml'`
-- Toast with undo via `water-toast-store.ts` → `WaterToast.tsx`; Dashboard listens for `water-changed` CustomEvent
+- **Water tracking on MealEntry**: `waterMlAdded` field stores how much water was auto-added, so removing the entry also subtracts the water
+- **Undo flow**: Toast with undo via `water-toast-store.ts` → `WaterToast.tsx`; undo clears `waterMlAdded` on entry via `clearMealEntryWater()` to prevent double-subtraction
+- **Delete flow**: `removeMealEntry()` checks `waterMlAdded` and subtracts from daily water; `meal-store.removeEntry()` dispatches `water-changed` event
 
 ### Cross-Component Communication
-- **`water-changed` CustomEvent**: dispatched after drink→water auto-add or undo; Dashboard listens to refresh water display
+- **`water-changed` CustomEvent**: dispatched after drink→water auto-add, undo, or meal entry deletion; Dashboard listens to refresh water display
 - **`themechange` CustomEvent**: dispatched from Profile theme toggle; App.tsx listens to apply dark mode
 
 ### Key Files

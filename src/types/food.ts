@@ -37,6 +37,7 @@ export interface MealEntry {
   quantityG: number;
   quantity?: number;
   points: number;
+  waterMlAdded?: number;
   loggedAt: Date;
 }
 

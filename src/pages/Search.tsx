@@ -142,23 +142,24 @@ export function Search() {
     const pointsPerItem = calculatePointsForQuantity(selectedFood.pointsPer100g, quantityG);
     const points = pointsPerItem * (quantity || 1);
 
-    await addEntry({
+    // Bereken waterinname vóór toevoegen, zodat we het op de entry kunnen opslaan
+    const drinkPct = getDrinkWaterPercentage(selectedFood.name);
+    const waterMlAdded = drinkPct > 0 ? Math.round(quantityG * (quantity || 1) * drinkPct) : undefined;
+
+    const entryId = await addEntry({
       foodItem: selectedFood,
       mealType,
       quantityG,
       quantity,
       points,
+      waterMlAdded,
     });
 
     // Drank → automatisch waterinname toevoegen
-    // Check op naam (niet unit), want lokale dranken hebben geen unit='ml'
-    const drinkPct = getDrinkWaterPercentage(selectedFood.name);
-    if (drinkPct > 0) {
-      const totalMl = quantityG * (quantity || 1);
-      const waterMl = Math.round(totalMl * drinkPct);
-      await addWaterIntake(selectedDate, waterMl);
+    if (waterMlAdded && waterMlAdded > 0) {
+      await addWaterIntake(selectedDate, waterMlAdded);
       window.dispatchEvent(new CustomEvent('water-changed'));
-      showWaterToast(waterMl, selectedFood.name, drinkPct);
+      showWaterToast(waterMlAdded, selectedFood.name, drinkPct, entryId);
     }
 
     navigator.vibrate?.(10);

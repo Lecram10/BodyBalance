@@ -1,13 +1,13 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { Droplets, Undo2 } from 'lucide-react';
 import { useWaterToastStore } from '../../store/water-toast-store';
-import { addWaterIntake } from '../../db/database';
+import { addWaterIntake, clearMealEntryWater } from '../../db/database';
 import { useMealStore } from '../../store/meal-store';
 
 const AUTO_HIDE_MS = 4000;
 
 export function WaterToast() {
-  const { visible, waterMl, drinkName, percentage, hide } = useWaterToastStore();
+  const { visible, waterMl, drinkName, percentage, entryId, hide } = useWaterToastStore();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedDate = useMealStore((s) => s.selectedDate);
 
@@ -24,10 +24,14 @@ export function WaterToast() {
   const handleUndo = useCallback(async () => {
     // Trek het toegevoegde water weer af
     await addWaterIntake(selectedDate, -waterMl);
+    // Wis waterMlAdded op de entry zodat verwijderen niet dubbel aftrekt
+    if (entryId) {
+      await clearMealEntryWater(entryId);
+    }
     // Dispatch event zodat Dashboard water UI bijwerkt
     window.dispatchEvent(new CustomEvent('water-changed'));
     hide();
-  }, [waterMl, selectedDate, hide]);
+  }, [waterMl, selectedDate, hide, entryId]);
 
   if (!visible) return null;
 

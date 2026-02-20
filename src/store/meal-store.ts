@@ -9,7 +9,7 @@ interface MealState {
   isLoading: boolean;
   setDate: (date: string) => void;
   loadEntries: () => Promise<void>;
-  addEntry: (entry: Omit<MealEntry, 'id' | 'dailyLogId' | 'loggedAt'>) => Promise<void>;
+  addEntry: (entry: Omit<MealEntry, 'id' | 'dailyLogId' | 'loggedAt'>) => Promise<number>;
   updateEntry: (id: number, updates: { quantityG: number; quantity?: number; points: number }) => Promise<void>;
   removeEntry: (id: number) => Promise<void>;
   getEntriesByMealType: (mealType: MealType) => MealEntry[];
@@ -34,8 +34,9 @@ export const useMealStore = create<MealState>((set, get) => ({
   },
 
   addEntry: async (entry) => {
-    await addMealEntry(get().selectedDate, entry);
+    const id = await addMealEntry(get().selectedDate, entry);
     await get().loadEntries();
+    return id;
   },
 
   updateEntry: async (id, updates) => {
@@ -44,7 +45,10 @@ export const useMealStore = create<MealState>((set, get) => ({
   },
 
   removeEntry: async (id: number) => {
-    await removeMealEntry(id);
+    const waterSubtracted = await removeMealEntry(id);
+    if (waterSubtracted > 0) {
+      window.dispatchEvent(new CustomEvent('water-changed'));
+    }
     await get().loadEntries();
   },
 

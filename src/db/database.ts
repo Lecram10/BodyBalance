@@ -68,14 +68,14 @@ export async function getMealEntriesForDate(date: string): Promise<MealEntry[]> 
   return db.mealEntries.where('dailyLogId').equals(log.id).toArray();
 }
 
-// Helper: voeg maaltijdentry toe en update daglog
+// Helper: voeg maaltijdentry toe en update daglog. Retourneert het nieuwe entry ID.
 export async function addMealEntry(
   date: string,
   entry: Omit<MealEntry, 'id' | 'dailyLogId' | 'loggedAt'>
-): Promise<void> {
+): Promise<number> {
   const log = await getOrCreateDailyLog(date);
 
-  await db.mealEntries.add({
+  const id = await db.mealEntries.add({
     ...entry,
     dailyLogId: log.id!,
     loggedAt: new Date(),
@@ -93,6 +93,7 @@ export async function addMealEntry(
   });
 
   syncDay(date);
+  return id as number;
 }
 
 // Helper: update een bestaande maaltijdentry (aantal, hoeveelheid, punten)
@@ -120,10 +121,14 @@ export async function updateMealEntry(
   }
 }
 
-// Helper: verwijder maaltijdentry en update daglog
-export async function removeMealEntry(entryId: number): Promise<void> {
+// Helper: verwijder maaltijdentry en update daglog.
+// Als de entry waterMlAdded had, wordt dat van de waterinname afgetrokken.
+// Retourneert het aantal ml water dat is afgetrokken (0 als geen).
+export async function removeMealEntry(entryId: number): Promise<number> {
   const entry = await db.mealEntries.get(entryId);
-  if (!entry) return;
+  if (!entry) return 0;
+
+  const waterToSubtract = entry.waterMlAdded ?? 0;
 
   await db.mealEntries.delete(entryId);
 
@@ -134,14 +139,23 @@ export async function removeMealEntry(entryId: number): Promise<void> {
       .toArray();
     const totalPoints = entries.reduce((sum, e) => sum + e.points, 0);
 
-    await db.dailyLogs.update(entry.dailyLogId, {
-      totalPointsUsed: totalPoints,
-    });
-
-    // Sync de dag waar deze entry bij hoorde
     const log = await db.dailyLogs.get(entry.dailyLogId);
-    if (log) syncDay(log.date);
+    if (log) {
+      const updates: { totalPointsUsed: number; waterMl?: number } = { totalPointsUsed: totalPoints };
+      if (waterToSubtract > 0) {
+        updates.waterMl = Math.max(0, (log.waterMl ?? 0) - waterToSubtract);
+      }
+      await db.dailyLogs.update(entry.dailyLogId, updates);
+      syncDay(log.date);
+    }
   }
+
+  return waterToSubtract;
+}
+
+// Helper: wis waterMlAdded van een entry (gebruikt door undo in WaterToast)
+export async function clearMealEntryWater(entryId: number): Promise<void> {
+  await db.mealEntries.update(entryId, { waterMlAdded: 0 });
 }
 
 // Helper: haal recent gebruikte producten op (uniek, laatste 15)

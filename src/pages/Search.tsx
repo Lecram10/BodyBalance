@@ -8,7 +8,7 @@ import { Card } from '../components/ui/Card';
 import { RecipeBuilderModal } from '../components/food/RecipeBuilderModal';
 import { searchFood, searchLocalFoods, searchUserFoods } from '../lib/food-api';
 import { calculatePointsForQuantity } from '../lib/points-calculator';
-import { calculateDrinkWaterMl, getDrinkWaterPercentage } from '../lib/drink-water-mapping';
+import { getDrinkWaterPercentage } from '../lib/drink-water-mapping';
 import { getRecentFoods, getFavoriteFoods, toggleFavorite, addWaterIntake } from '../db/database';
 import { useMealStore } from '../store/meal-store';
 import { useWaterToastStore } from '../store/water-toast-store';
@@ -151,15 +151,14 @@ export function Search() {
     });
 
     // Drank → automatisch waterinname toevoegen
-    if (selectedFood.unit === 'ml') {
+    // Check op naam (niet unit), want lokale dranken hebben geen unit='ml'
+    const drinkPct = getDrinkWaterPercentage(selectedFood.name);
+    if (drinkPct > 0) {
       const totalMl = quantityG * (quantity || 1);
-      const waterMl = calculateDrinkWaterMl(selectedFood.name, totalMl);
-      if (waterMl > 0) {
-        const pct = getDrinkWaterPercentage(selectedFood.name);
-        await addWaterIntake(selectedDate, waterMl);
-        window.dispatchEvent(new CustomEvent('water-changed'));
-        showWaterToast(waterMl, selectedFood.name, pct);
-      }
+      const waterMl = Math.round(totalMl * drinkPct);
+      await addWaterIntake(selectedDate, waterMl);
+      window.dispatchEvent(new CustomEvent('water-changed'));
+      showWaterToast(waterMl, selectedFood.name, drinkPct);
     }
 
     navigator.vibrate?.(10);

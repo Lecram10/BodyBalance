@@ -5,7 +5,7 @@ import { AddFoodModal } from '../components/food/AddFoodModal';
 import { Card } from '../components/ui/Card';
 import { lookupBarcode } from '../lib/food-api';
 import { calculatePointsPer100g, calculatePointsForQuantity } from '../lib/points-calculator';
-import { calculateDrinkWaterMl, getDrinkWaterPercentage } from '../lib/drink-water-mapping';
+import { getDrinkWaterPercentage } from '../lib/drink-water-mapping';
 import { saveCustomFood, addWaterIntake } from '../db/database';
 import { recognizeFoodFromImage, getAISettings } from '../lib/ai-service';
 import { useMealStore } from '../store/meal-store';
@@ -124,15 +124,14 @@ export function Scan() {
     await addEntry({ foodItem: foundFood, mealType, quantityG, quantity, points });
 
     // Drank → automatisch waterinname toevoegen
-    if (foundFood.unit === 'ml') {
+    // Check op naam (niet unit), want lokale dranken hebben geen unit='ml'
+    const drinkPct = getDrinkWaterPercentage(foundFood.name);
+    if (drinkPct > 0) {
       const totalMl = quantityG * (quantity || 1);
-      const waterMl = calculateDrinkWaterMl(foundFood.name, totalMl);
-      if (waterMl > 0) {
-        const pct = getDrinkWaterPercentage(foundFood.name);
-        await addWaterIntake(selectedDate, waterMl);
-        window.dispatchEvent(new CustomEvent('water-changed'));
-        showWaterToast(waterMl, foundFood.name, pct);
-      }
+      const waterMl = Math.round(totalMl * drinkPct);
+      await addWaterIntake(selectedDate, waterMl);
+      window.dispatchEvent(new CustomEvent('water-changed'));
+      showWaterToast(waterMl, foundFood.name, drinkPct);
     }
 
     setFoundFood(null);

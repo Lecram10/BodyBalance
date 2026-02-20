@@ -8,8 +8,10 @@ import { Card } from '../components/ui/Card';
 import { RecipeBuilderModal } from '../components/food/RecipeBuilderModal';
 import { searchFood, searchLocalFoods, searchUserFoods } from '../lib/food-api';
 import { calculatePointsForQuantity } from '../lib/points-calculator';
-import { getRecentFoods, getFavoriteFoods, toggleFavorite } from '../db/database';
+import { calculateDrinkWaterMl, getDrinkWaterPercentage } from '../lib/drink-water-mapping';
+import { getRecentFoods, getFavoriteFoods, toggleFavorite, addWaterIntake } from '../db/database';
 import { useMealStore } from '../store/meal-store';
+import { useWaterToastStore } from '../store/water-toast-store';
 import type { FoodItem, MealType } from '../types/food';
 import { ZERO_POINT_CATEGORIES } from '../lib/zero-point-foods';
 import { Search as SearchIcon, Loader2, Clock, Heart, Plus, ChefHat, Leaf, ChevronDown, ChevronRight } from 'lucide-react';
@@ -35,6 +37,8 @@ export function Search() {
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const addEntry = useMealStore((s) => s.addEntry);
+  const selectedDate = useMealStore((s) => s.selectedDate);
+  const showWaterToast = useWaterToastStore((s) => s.show);
 
   // Laad recent en favorieten bij mount
   useEffect(() => {
@@ -145,6 +149,18 @@ export function Search() {
       quantity,
       points,
     });
+
+    // Drank → automatisch waterinname toevoegen
+    if (selectedFood.unit === 'ml') {
+      const totalMl = quantityG * (quantity || 1);
+      const waterMl = calculateDrinkWaterMl(selectedFood.name, totalMl);
+      if (waterMl > 0) {
+        const pct = getDrinkWaterPercentage(selectedFood.name);
+        await addWaterIntake(selectedDate, waterMl);
+        window.dispatchEvent(new CustomEvent('water-changed'));
+        showWaterToast(waterMl, selectedFood.name, pct);
+      }
+    }
 
     navigator.vibrate?.(10);
     setSelectedFood(null);

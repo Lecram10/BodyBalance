@@ -16,6 +16,7 @@ import { Statistics } from './pages/Statistics';
 import { AIChat } from './pages/AIChat';
 import { Profile } from './pages/Profile';
 import { Admin } from './pages/Admin';
+import { WaterToast } from './components/ui/WaterToast';
 import { WifiOff, RefreshCw } from 'lucide-react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
@@ -283,6 +284,7 @@ function App() {
     <BrowserRouter>
       <OfflineBanner />
       <UpdatePrompt />
+      <WaterToast />
       <AppContent />
     </BrowserRouter>
   );

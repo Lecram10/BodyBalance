@@ -98,6 +98,13 @@ export function Dashboard() {
     loadWater();
   }, [loadWater]);
 
+  // Herlaad water als een drank automatisch water heeft toegevoegd (of ongedaan gemaakt)
+  useEffect(() => {
+    const handler = () => loadWater();
+    window.addEventListener('water-changed', handler);
+    return () => window.removeEventListener('water-changed', handler);
+  }, [loadWater]);
+
   // Laad streak
   useEffect(() => {
     if (profile) {

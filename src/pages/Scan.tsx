@@ -5,9 +5,11 @@ import { AddFoodModal } from '../components/food/AddFoodModal';
 import { Card } from '../components/ui/Card';
 import { lookupBarcode } from '../lib/food-api';
 import { calculatePointsPer100g, calculatePointsForQuantity } from '../lib/points-calculator';
-import { saveCustomFood } from '../db/database';
+import { calculateDrinkWaterMl, getDrinkWaterPercentage } from '../lib/drink-water-mapping';
+import { saveCustomFood, addWaterIntake } from '../db/database';
 import { recognizeFoodFromImage, getAISettings } from '../lib/ai-service';
 import { useMealStore } from '../store/meal-store';
+import { useWaterToastStore } from '../store/water-toast-store';
 import type { FoodItem, MealType, NutritionPer100g } from '../types/food';
 import { ScanBarcode, Loader2, AlertCircle, Camera, ShieldAlert, ImagePlus } from 'lucide-react';
 
@@ -22,6 +24,8 @@ export function Scan() {
   const [lastBarcode, setLastBarcode] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const addEntry = useMealStore((s) => s.addEntry);
+  const selectedDate = useMealStore((s) => s.selectedDate);
+  const showWaterToast = useWaterToastStore((s) => s.show);
 
   // AI Photo state
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -113,10 +117,24 @@ export function Scan() {
     }
   };
 
-  const handleAddFood = async (quantityG: number, mealType: MealType) => {
+  const handleAddFood = async (quantityG: number, mealType: MealType, quantity?: number) => {
     if (!foundFood) return;
-    const points = calculatePointsForQuantity(foundFood.pointsPer100g, quantityG);
-    await addEntry({ foodItem: foundFood, mealType, quantityG, points });
+    const pointsPerItem = calculatePointsForQuantity(foundFood.pointsPer100g, quantityG);
+    const points = pointsPerItem * (quantity || 1);
+    await addEntry({ foodItem: foundFood, mealType, quantityG, quantity, points });
+
+    // Drank → automatisch waterinname toevoegen
+    if (foundFood.unit === 'ml') {
+      const totalMl = quantityG * (quantity || 1);
+      const waterMl = calculateDrinkWaterMl(foundFood.name, totalMl);
+      if (waterMl > 0) {
+        const pct = getDrinkWaterPercentage(foundFood.name);
+        await addWaterIntake(selectedDate, waterMl);
+        window.dispatchEvent(new CustomEvent('water-changed'));
+        showWaterToast(waterMl, foundFood.name, pct);
+      }
+    }
+
     setFoundFood(null);
     setLastBarcode(null);
   };

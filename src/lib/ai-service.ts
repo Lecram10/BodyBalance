@@ -2,6 +2,10 @@ import { db } from '../db/database';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
+/** Haiku 4.5 voor chat en vision — ~73% goedkoper dan Sonnet 4.5 */
+const AI_MODEL_CHAT = 'claude-haiku-4-5-20251001';
+const AI_MODEL_VISION = 'claude-haiku-4-5-20251001';
+
 interface AISettings {
   apiKey: string;
   apiUrl?: string;
@@ -44,7 +48,8 @@ interface AIMessage {
 
 export async function sendAIMessage(
   messages: AIMessage[],
-  systemPrompt: string
+  systemPrompt: string,
+  model?: string
 ): Promise<string> {
   const settings = await getAISettings();
   if (!settings?.apiKey) {
@@ -60,7 +65,7 @@ export async function sendAIMessage(
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-5-20250929',
+      model: model || AI_MODEL_CHAT,
       max_tokens: 1024,
       system: systemPrompt,
       messages,
@@ -97,6 +102,7 @@ Als je geen voedsel herkent, antwoord dan met een lege array [].`;
         { type: 'text', text: 'Welk voedsel zie je op deze foto? Geef de voedingswaarden.' },
       ],
     }],
-    systemPrompt
+    systemPrompt,
+    AI_MODEL_VISION
   );
 }

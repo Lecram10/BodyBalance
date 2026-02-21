@@ -11,7 +11,7 @@ import { getAISettings, saveAISettings } from '../lib/ai-service';
 import { ACTIVITY_LABELS, GOAL_LABELS } from '../types/user';
 import type { Gender, ActivityLevel, Goal } from '../types/user';
 import { format } from 'date-fns';
-import { Download, Upload, Bell, BellOff, Droplets, Key, Bot, Check, AlertCircle, Sun, Moon, Monitor, LogOut, Shield, TrendingDown, Trophy } from 'lucide-react';
+import { Download, Upload, Bell, BellOff, Droplets, Key, Check, AlertCircle, Sun, Moon, Monitor, LogOut, Shield, TrendingDown, Trophy } from 'lucide-react';
 import { useAuthStore } from '../store/auth-store';
 import { pushWeight, pushAll } from '../lib/firestore-sync';
 import { auth } from '../lib/firebase';
@@ -429,20 +429,6 @@ export function Profile() {
             </div>
           )}
         </Card>
-
-        {/* AI Chat link */}
-        <button
-          onClick={() => navigate('/ai-chat')}
-          className="flex items-center gap-3 w-full p-4 bg-white rounded-2xl shadow-sm border-none cursor-pointer active:bg-gray-50 text-left"
-        >
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <Bot size={20} className="text-primary" />
-          </div>
-          <div className="flex-1">
-            <div className="text-[15px] font-semibold">AI Voedingsassistent</div>
-            <div className="text-[13px] text-ios-secondary">Stel vragen over punten en voeding</div>
-          </div>
-        </button>
 
         {/* AI Instellingen */}
         <Card>

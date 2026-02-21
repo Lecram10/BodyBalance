@@ -7,13 +7,19 @@ import { lookupBarcode } from '../lib/food-api';
 import { calculatePointsPer100g, calculatePointsForQuantity } from '../lib/points-calculator';
 import { getDrinkWaterPercentage } from '../lib/drink-water-mapping';
 import { saveCustomFood, addWaterIntake } from '../db/database';
-import { recognizeFoodFromImage, getAISettings } from '../lib/ai-service';
+import { recognizeFoodFromImage, getAISettings, sendAIMessage } from '../lib/ai-service';
 import { useMealStore } from '../store/meal-store';
+import { useUserStore } from '../store/user-store';
 import { useWaterToastStore } from '../store/water-toast-store';
 import type { FoodItem, MealType, NutritionPer100g } from '../types/food';
-import { ScanBarcode, Loader2, AlertCircle, Camera, ShieldAlert, ImagePlus } from 'lucide-react';
+import { ScanBarcode, Loader2, AlertCircle, Camera, ShieldAlert, ImagePlus, Bot, Send, User } from 'lucide-react';
 
-type ScanTab = 'barcode' | 'photo';
+type ScanTab = 'barcode' | 'photo' | 'chat';
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
 type CameraState = 'idle' | 'requesting' | 'scanning' | 'denied' | 'unavailable' | 'looking-up';
 
 export function Scan() {
@@ -25,7 +31,16 @@ export function Scan() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const addEntry = useMealStore((s) => s.addEntry);
   const selectedDate = useMealStore((s) => s.selectedDate);
+  const { getTotalPoints } = useMealStore();
+  const profile = useUserStore((s) => s.profile);
   const showWaterToast = useWaterToastStore((s) => s.show);
+
+  // AI Chat state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [hasChatApiKey, setHasChatApiKey] = useState<boolean | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   // AI Photo state
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -223,15 +238,69 @@ export function Scan() {
   };
 
   const handleTabChange = (tab: ScanTab) => {
-    if (tab === 'barcode' && activeTab === 'photo') {
-      // Reset photo state
+    if (activeTab === 'photo' && tab !== 'photo') {
       setPhotoPreview(null);
       setRecognizedFoods([]);
       setPhotoError(null);
-    } else if (tab === 'photo' && activeTab === 'barcode') {
+    }
+    if (activeTab === 'barcode' && tab !== 'barcode') {
       stopScanner();
     }
     setActiveTab(tab);
+  };
+
+  // AI Chat logic
+  useEffect(() => {
+    if (activeTab === 'chat' && hasChatApiKey === null) {
+      getAISettings().then((s) => setHasChatApiKey(!!s?.apiKey));
+    }
+  }, [activeTab, hasChatApiKey]);
+
+  useEffect(() => {
+    chatScrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  const getChatSystemPrompt = () => {
+    const used = getTotalPoints();
+    const budget = profile?.dailyPointsBudget ?? 30;
+    const remaining = budget - used;
+    return `Je bent een vriendelijke Nederlandse voedingsassistent voor de app BodyBalance.
+De gebruiker volgt een puntensysteem vergelijkbaar met Weight Watchers.
+
+Huidige status:
+- Dagbudget: ${budget} punten
+- Vandaag gebruikt: ${used} punten
+- Resterend: ${remaining} punten
+
+Puntenformule: (cal × 0.03) + (verz.vet × 0.28) + (suiker × 0.12) - (eiwit × 0.10) - (vezels × 0.10) - (onverz.vet × 0.05), minimum 0.
+
+Regels:
+- Antwoord altijd in het Nederlands
+- Geef korte, praktische antwoorden
+- Bij vragen over punten: bereken met de formule hierboven
+- Bij suggesties: houd rekening met resterende punten
+- Gebruik geen emojis tenzij de gebruiker ze gebruikt`;
+  };
+
+  const handleChatSend = async () => {
+    if (!chatInput.trim() || isChatLoading) return;
+    const userMessage: ChatMessage = { role: 'user', content: chatInput.trim() };
+    const newMessages = [...chatMessages, userMessage];
+    setChatMessages(newMessages);
+    setChatInput('');
+    setIsChatLoading(true);
+    try {
+      const response = await sendAIMessage(
+        newMessages.map((m) => ({ role: m.role, content: m.content })),
+        getChatSystemPrompt()
+      );
+      setChatMessages([...newMessages, { role: 'assistant', content: response }]);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Onbekende fout';
+      setChatMessages([...newMessages, { role: 'assistant', content: `Fout: ${msg}` }]);
+    } finally {
+      setIsChatLoading(false);
+    }
   };
 
   return (
@@ -256,6 +325,15 @@ export function Scan() {
           >
             <ImagePlus size={14} />
             AI Foto
+          </button>
+          <button
+            onClick={() => handleTabChange('chat')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[13px] font-medium border-none cursor-pointer transition-colors ${
+              activeTab === 'chat' ? 'bg-white text-primary shadow-sm' : 'bg-transparent text-ios-secondary'
+            }`}
+          >
+            <Bot size={14} />
+            Assistent
           </button>
         </div>
 
@@ -424,6 +502,105 @@ export function Scan() {
               </button>
             )}
           </>
+        )}
+
+        {/* AI Chat tab */}
+        {activeTab === 'chat' && (
+          hasChatApiKey === false ? (
+            <div className="flex flex-col items-center justify-center py-16 px-6">
+              <div className="w-20 h-20 rounded-full bg-ios-warning/10 flex items-center justify-center mb-4">
+                <AlertCircle size={40} className="text-ios-warning" />
+              </div>
+              <h3 className="text-[17px] font-semibold mb-2 text-center">API-sleutel vereist</h3>
+              <p className="text-[14px] text-ios-secondary text-center leading-relaxed">
+                Om de AI assistent te gebruiken heb je een Anthropic API-sleutel nodig.
+                Ga naar <strong>Profiel → AI Instellingen</strong> om je sleutel in te voeren.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col w-full" style={{ minHeight: 'calc(100vh - 230px)' }}>
+              <div className="flex-1 flex flex-col gap-3 pb-4">
+                {chatMessages.length === 0 && (
+                  <div className="text-center py-8">
+                    <Bot size={48} className="text-ios-separator mx-auto mb-3" />
+                    <p className="text-[17px] text-ios-secondary font-medium">Hoi! Ik ben je voedingsassistent</p>
+                    <p className="text-[13px] text-ios-secondary mt-2 max-w-xs mx-auto leading-relaxed">
+                      Stel me vragen over punten, voedingswaarden of vraag om maaltijdsuggesties.
+                    </p>
+                    <div className="flex flex-col gap-2 mt-5 max-w-xs mx-auto">
+                      {[
+                        'Hoeveel punten heeft een broodje kaas?',
+                        'Wat kan ik eten met 5 punten?',
+                        'Geef me een gezond lunch-idee',
+                      ].map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          onClick={() => setChatInput(suggestion)}
+                          className="text-left px-4 py-2.5 bg-white rounded-xl text-[14px] text-primary border border-ios-separator cursor-pointer active:bg-gray-50"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {chatMessages.map((msg, i) => (
+                  <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {msg.role === 'assistant' && (
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Bot size={16} className="text-primary" />
+                      </div>
+                    )}
+                    <Card className={`max-w-[80%] px-4 py-3 ${msg.role === 'user' ? 'bg-primary text-white' : ''}`}>
+                      <p className={`text-[15px] leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'text-white' : ''}`}>
+                        {msg.content}
+                      </p>
+                    </Card>
+                    {msg.role === 'user' && (
+                      <div className="w-8 h-8 rounded-full bg-ios-bg flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <User size={16} className="text-ios-secondary" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {isChatLoading && (
+                  <div className="flex gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Bot size={16} className="text-primary" />
+                    </div>
+                    <Card className="px-4 py-3">
+                      <Loader2 size={18} className="text-ios-secondary animate-spin" />
+                    </Card>
+                  </div>
+                )}
+                <div ref={chatScrollRef} />
+              </div>
+
+              <div className="sticky bottom-[70px] bg-ios-bg pt-2 pb-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Stel een vraag..."
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleChatSend()}
+                    className="flex-1 bg-white rounded-xl px-4 py-3 text-[16px] border border-ios-separator"
+                  />
+                  <button
+                    onClick={handleChatSend}
+                    disabled={!chatInput.trim() || isChatLoading}
+                    className={`w-11 h-11 rounded-full flex items-center justify-center border-none cursor-pointer transition-colors ${
+                      chatInput.trim() && !isChatLoading ? 'bg-primary text-white' : 'bg-ios-bg text-ios-separator'
+                    }`}
+                  >
+                    <Send size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
         )}
       </div>
 

@@ -13,7 +13,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Search } from './pages/Search';
 import { Scan } from './pages/Scan';
 import { Statistics } from './pages/Statistics';
-import { AIChat } from './pages/AIChat';
+
 import { Profile } from './pages/Profile';
 import { Admin } from './pages/Admin';
 import { WaterToast } from './components/ui/WaterToast';
@@ -133,7 +133,7 @@ function AppContent() {
         <Route path="/search" element={<Search />} />
         <Route path="/scan" element={<Scan />} />
         <Route path="/statistics" element={<Statistics />} />
-        <Route path="/ai-chat" element={<AIChat />} />
+
         <Route path="/profile" element={<Profile />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />

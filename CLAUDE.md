@@ -42,11 +42,18 @@ firebase deploy      # Deploy hosting + Firestore rules
 - Detection is on **name only** — local foods (`dutch-foods.ts`) have no `unit` field, so don't gate on `unit === 'ml'`
 - **Water tracking on MealEntry**: `waterMlAdded` field stores how much water was auto-added, so removing the entry also subtracts the water
 - **Undo flow**: Toast with undo via `water-toast-store.ts` → `WaterToast.tsx`; undo clears `waterMlAdded` on entry via `clearMealEntryWater()` to prevent double-subtraction
+- **Edit flow**: `updateMealEntry()` recalculates `waterMlAdded` based on new quantity and adjusts daily water by the delta; `meal-store.updateEntry()` dispatches `water-changed` event
 - **Delete flow**: `removeMealEntry()` checks `waterMlAdded` and subtracts from daily water; `meal-store.removeEntry()` dispatches `water-changed` event
 
 ### Cross-Component Communication
 - **`water-changed` CustomEvent**: dispatched after drink→water auto-add, undo, or meal entry deletion; Dashboard listens to refresh water display
 - **`themechange` CustomEvent**: dispatched from Profile theme toggle; App.tsx listens to apply dark mode
+
+### AI Features (`src/lib/ai-service.ts`)
+- **Models**: Haiku 4.5 for both chat and vision (`AI_MODEL_CHAT`, `AI_MODEL_VISION` — independently configurable)
+- **Scan page** (`src/pages/Scan.tsx`) hosts 3 tabs: Barcode scanner, AI Photo recognition, AI Chat assistant
+- `anthropic-dangerous-direct-browser-access` header required for browser-direct API calls
+- API key stored in IndexedDB (`anthropicApiKey`), NEVER pushed to Firestore
 
 ### Key Files
 - `src/App.tsx` — Router, auth gate, sync orchestration, notification scheduler, theme watcher
@@ -57,6 +64,7 @@ firebase deploy      # Deploy hosting + Firestore rules
 - `src/lib/budget-calculator.ts` — BMR, TDEE, points budget calculation
 - `src/lib/points-calculator.ts` — Food points formula
 - `src/lib/food-api.ts` — Open Food Facts API (NL filter: `tagtype_0=countries`)
+- `src/lib/ai-service.ts` — Anthropic API calls (chat + vision), settings management
 - `src/lib/drink-water-mapping.ts` — Drink name → water percentage mapping
 - `src/lib/dutch-foods.ts` — Local NL food database (no `unit` field — all use grams/servingSizeG)
 - `src/pages/Admin.tsx` — Invite codes, user management, data reset (admin-only)

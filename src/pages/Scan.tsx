@@ -6,13 +6,13 @@ import { Card } from '../components/ui/Card';
 import { lookupBarcode } from '../lib/food-api';
 import { calculatePointsPer100g, calculatePointsForQuantity } from '../lib/points-calculator';
 import { getDrinkWaterPercentage } from '../lib/drink-water-mapping';
-import { saveCustomFood, addWaterIntake } from '../db/database';
+import { saveCustomFood, addWaterIntake, toggleFavorite } from '../db/database';
 import { recognizeFoodFromImage, getAISettings, sendAIMessage } from '../lib/ai-service';
 import { useMealStore } from '../store/meal-store';
 import { useUserStore } from '../store/user-store';
 import { useWaterToastStore } from '../store/water-toast-store';
 import type { FoodItem, MealType, NutritionPer100g } from '../types/food';
-import { ScanBarcode, Loader2, AlertCircle, Camera, ShieldAlert, ImagePlus, Bot, Send, User } from 'lucide-react';
+import { ScanBarcode, Loader2, AlertCircle, Camera, ShieldAlert, ImagePlus, Bot, Send, User, Heart } from 'lucide-react';
 
 type ScanTab = 'barcode' | 'photo' | 'chat';
 
@@ -231,10 +231,17 @@ export function Scan() {
       pointsPer100g: food.pointsPer100g,
       servingSizeG: food.servingSizeG,
       isZeroPoint: food.isZeroPoint,
-      isFavorite: false,
+      isFavorite: food.isFavorite || false,
       source: 'user',
     });
     setFoundFood(saved);
+  };
+
+  const handleToggleRecognizedFavorite = async (food: FoodItem, index: number) => {
+    const newStatus = await toggleFavorite(food);
+    setRecognizedFoods(prev =>
+      prev.map((f, i) => i === index ? { ...f, isFavorite: newStatus } : f)
+    );
   };
 
   const handleTabChange = (tab: ScanTab) => {
@@ -482,6 +489,15 @@ Regels:
                       <div className="text-[15px] font-medium">{food.name}</div>
                       <div className="text-[13px] text-ios-secondary">{food.servingSizeG}g — {food.pointsPer100g} pt/100g</div>
                     </div>
+                    <button
+                      onClick={() => handleToggleRecognizedFavorite(food, i)}
+                      className="flex-shrink-0 p-2 border-none bg-transparent cursor-pointer active:scale-125 transition-transform"
+                    >
+                      <Heart
+                        size={20}
+                        className={food.isFavorite ? 'text-red-500 fill-red-500' : 'text-ios-separator'}
+                      />
+                    </button>
                     <button
                       onClick={() => handleAddRecognizedFood(food)}
                       className="px-3 py-1.5 bg-primary text-white rounded-lg text-[13px] font-medium border-none cursor-pointer"

@@ -8,8 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev          # Vite dev server
 npm run build        # TypeScript check + Vite build (output → docs/)
 npm run lint         # ESLint
+npm run preview      # Preview production build locally
 firebase deploy      # Deploy hosting + Firestore rules
 ```
+
+No test framework is configured — verify changes with `npm run build` and `npm run lint`.
 
 ## Architecture
 
@@ -19,6 +22,7 @@ firebase deploy      # Deploy hosting + Firestore rules
 - React 19 + TypeScript + Vite 7 + Tailwind CSS 4
 - Zustand (state) + Dexie.js (IndexedDB v2) + Firebase SDK 11 (Auth, Firestore, Hosting)
 - BrowserRouter with Firebase Hosting SPA rewrite (`** → /index.html`)
+- PWA via `vite-plugin-pwa` — `registerType: 'prompt'` (user-prompted updates), OpenFoodFacts API cached via Workbox NetworkFirst strategy
 
 ### Offline-First Sync
 - **IndexedDB is primary** — all reads/writes go to Dexie first

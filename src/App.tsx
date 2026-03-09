@@ -15,7 +15,7 @@ import { Scan } from './pages/Scan';
 import { Statistics } from './pages/Statistics';
 
 import { Profile } from './pages/Profile';
-import { Admin } from './pages/Admin';
+import { Admin, isAdmin } from './pages/Admin';
 import { WaterToast } from './components/ui/WaterToast';
 import { WifiOff, RefreshCw } from 'lucide-react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -135,7 +135,7 @@ function AppContent() {
         <Route path="/statistics" element={<Statistics />} />
 
         <Route path="/profile" element={<Profile />} />
-        <Route path="/admin" element={<Admin />} />
+        <Route path="/admin" element={isAdmin() ? <Admin /> : <Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />

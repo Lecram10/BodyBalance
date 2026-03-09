@@ -20,19 +20,38 @@ service cloud.firestore {
       allow read: if request.auth != null && (request.auth.uid == userId || isAdminUser());
       allow write: if request.auth != null && request.auth.uid == userId;
 
-      // Subcollecties onder gebruiker
-      match /{subcollection}/{docId} {
-        // Admin mag profielen lezen + disabled veld schrijven
+      // Profiel subcollectie: eigenaar + admin (voor disabled toggle + reset)
+      match /profile/{docId} {
         allow read: if request.auth != null && (request.auth.uid == userId || isAdminUser());
         allow write: if request.auth != null && (request.auth.uid == userId || isAdminUser());
+      }
+
+      // Days, weight, foods: eigenaar volledige toegang, admin alleen lezen + delete (voor resetUserData)
+      match /days/{docId} {
+        allow read: if request.auth != null && (request.auth.uid == userId || isAdminUser());
+        allow create, update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && (request.auth.uid == userId || isAdminUser());
+      }
+
+      match /weight/{docId} {
+        allow read: if request.auth != null && (request.auth.uid == userId || isAdminUser());
+        allow create, update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && (request.auth.uid == userId || isAdminUser());
+      }
+
+      match /foods/{docId} {
+        allow read: if request.auth != null && (request.auth.uid == userId || isAdminUser());
+        allow create, update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && (request.auth.uid == userId || isAdminUser());
       }
     }
 
     // Invite codes
     match /inviteCodes/{code} {
-      // Lezen: iedereen (nodig voor validatie bij registratie, voordat user is ingelogd)
-      // Codes zijn 8-teken random strings, geen gevoelige data
-      allow read: if true;
+      // Individuele code opzoeken: iedereen (nodig voor pre-auth validatie bij registratie)
+      allow get: if true;
+      // Alle codes oplijsten: alleen admin (voorkomt enumeratie van ongebruikte codes)
+      allow list: if isAdminUser();
       // Schrijven: alleen admin (codes aanmaken/beheren)
       allow write: if isAdminUser();
       // Claimen: ingelogde gebruiker mag code markeren als gebruikt

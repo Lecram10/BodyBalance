@@ -218,7 +218,7 @@ export async function lookupBarcode(barcode: string): Promise<FoodItem | null> {
 
   // A: Probeer NL domein
   try {
-    const nlResult = await fetchBarcode(`${OFF_API_BASE}/api/v2/product/${barcode}?fields=${OFF_BARCODE_FIELDS}`);
+    const nlResult = await fetchBarcode(`${OFF_API_BASE}/api/v2/product/${encodeURIComponent(barcode)}?fields=${OFF_BARCODE_FIELDS}`);
     if (nlResult) { await cacheBarcodeLookup(nlResult); return nlResult; }
   } catch {
     // ignore, probeer world fallback
@@ -226,7 +226,7 @@ export async function lookupBarcode(barcode: string): Promise<FoodItem | null> {
 
   // A: Fallback naar world domein
   try {
-    const worldResult = await fetchBarcode(`https://world.openfoodfacts.org/api/v2/product/${barcode}?fields=${OFF_BARCODE_FIELDS}`);
+    const worldResult = await fetchBarcode(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}?fields=${OFF_BARCODE_FIELDS}`);
     if (worldResult) { await cacheBarcodeLookup(worldResult); return worldResult; }
   } catch (error) {
     console.error('Barcode lookup fout:', error);

@@ -118,10 +118,17 @@ export function Profile() {
     }
   };
 
+  const [aiError, setAiError] = useState('');
+
   const handleSaveAI = async () => {
-    await saveAISettings(apiKey, apiUrl || undefined);
-    setAiSaved(true);
-    setTimeout(() => setAiSaved(false), 2000);
+    try {
+      setAiError('');
+      await saveAISettings(apiKey, apiUrl || undefined);
+      setAiSaved(true);
+      setTimeout(() => setAiSaved(false), 2000);
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : 'Opslaan mislukt');
+    }
   };
 
   const checkNotificationPermission = () => {
@@ -226,11 +233,45 @@ export function Profile() {
         const text = await file.text();
         const data = JSON.parse(text);
 
-        if (!data.version || !data.userProfiles) {
+        // Valideer basisstructuur
+        if (!data.version || !Array.isArray(data.userProfiles) || data.userProfiles.length === 0) {
           setImportStatus('Ongeldig bestand');
           setTimeout(() => setImportStatus(null), 3000);
           return;
         }
+
+        // Valideer profiel
+        const profile0 = data.userProfiles[0];
+        if (!profile0.name || !profile0.gender || !profile0.heightCm) {
+          setImportStatus('Ongeldig profiel in backup');
+          setTimeout(() => setImportStatus(null), 3000);
+          return;
+        }
+
+        // Valideer arrays
+        for (const key of ['foodItems', 'mealEntries', 'dailyLogs', 'weightEntries']) {
+          if (data[key] && !Array.isArray(data[key])) {
+            setImportStatus(`Ongeldig formaat voor ${key}`);
+            setTimeout(() => setImportStatus(null), 3000);
+            return;
+          }
+        }
+
+        // Size guard
+        const totalEntries = (data.mealEntries?.length || 0) + (data.dailyLogs?.length || 0)
+          + (data.weightEntries?.length || 0) + (data.foodItems?.length || 0);
+        if (totalEntries > 50000) {
+          setImportStatus('Backup is te groot (max 50.000 items)');
+          setTimeout(() => setImportStatus(null), 3000);
+          return;
+        }
+
+        // Strip API keys uit geïmporteerde profielen
+        const safeProfiles = data.userProfiles.map((p: Record<string, unknown>) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { anthropicApiKey, anthropicApiUrl, ...safe } = p;
+          return safe;
+        });
 
         // Wis bestaande data en importeer
         await db.transaction('rw', [db.userProfiles, db.foodItems, db.mealEntries, db.dailyLogs, db.weightEntries], async () => {
@@ -240,7 +281,7 @@ export function Profile() {
           await db.weightEntries.clear();
           await db.userProfiles.clear();
 
-          if (data.userProfiles?.length) await db.userProfiles.bulkAdd(data.userProfiles);
+          if (safeProfiles.length) await db.userProfiles.bulkAdd(safeProfiles);
           if (data.foodItems?.length) await db.foodItems.bulkAdd(data.foodItems);
           if (data.mealEntries?.length) await db.mealEntries.bulkAdd(data.mealEntries);
           if (data.dailyLogs?.length) await db.dailyLogs.bulkAdd(data.dailyLogs);
@@ -470,6 +511,9 @@ export function Profile() {
                 'Opslaan'
               )}
             </Button>
+            {aiError && (
+              <p className="text-[12px] text-ios-destructive text-center">{aiError}</p>
+            )}
             <p className="text-[12px] text-ios-secondary text-center">
               Nodig voor AI foto-herkenning en de voedingsassistent
             </p>

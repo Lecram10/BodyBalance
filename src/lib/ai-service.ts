@@ -1,10 +1,24 @@
 import { db } from '../db/database';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const ALLOWED_API_HOSTS = ['api.anthropic.com'];
 
 /** Haiku 4.5 voor chat en vision — ~73% goedkoper dan Sonnet 4.5 */
 const AI_MODEL_CHAT = 'claude-haiku-4-5-20251001';
 const AI_MODEL_VISION = 'claude-haiku-4-5-20251001';
+
+function validateApiUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (!ALLOWED_API_HOSTS.includes(parsed.hostname)) {
+      throw new Error('Alleen api.anthropic.com is toegestaan als API host.');
+    }
+    return url;
+  } catch (e) {
+    if (e instanceof TypeError) throw new Error('Ongeldige API URL.');
+    throw e;
+  }
+}
 
 interface AISettings {
   apiKey: string;
@@ -22,11 +36,12 @@ export async function getAISettings(): Promise<AISettings | null> {
 }
 
 export async function saveAISettings(apiKey: string, apiUrl?: string): Promise<void> {
+  const validatedUrl = apiUrl?.trim() ? validateApiUrl(apiUrl.trim()) : ANTHROPIC_API_URL;
   const profile = await db.userProfiles.toCollection().first();
   if (profile?.id) {
     await db.userProfiles.update(profile.id, {
       anthropicApiKey: apiKey,
-      anthropicApiUrl: apiUrl || ANTHROPIC_API_URL,
+      anthropicApiUrl: validatedUrl,
     } as Record<string, unknown>);
   }
 }
@@ -56,7 +71,9 @@ export async function sendAIMessage(
     throw new Error('Geen API-sleutel ingesteld. Ga naar Profiel → AI Instellingen.');
   }
 
-  const response = await fetch(settings.apiUrl || ANTHROPIC_API_URL, {
+  const apiUrl = validateApiUrl(settings.apiUrl || ANTHROPIC_API_URL);
+
+  const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
